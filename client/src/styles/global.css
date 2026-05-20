@@ -1,15 +1,155 @@
+/* ─────────────────────────────────────────────────────
+   Latitude — global tokens, resets, type scale
+   ───────────────────────────────────────────────────── */
+
 :root {
+  /* Surfaces */
+  --bg:           #0d0d0d;
+  --bg-elev:      #141414;
+  --surface:      #181818;
+  --surface-2:    #1f1f1f;
+  --border:       #2a2a2a;
+  --border-soft:  #222;
+  --border-bright:#3a3a3a;
+
+  /* Text */
+  --text:         #e8e6e1;
+  --text-soft:    #a0a0a0;
+  --text-faint:   #6a6a6a;
+  --text-dim:     #4a4a4a;
+
+  /* Single accent — teal/cyan */
+  --accent:       #2dd4bf;
+  --accent-bright:#5eead4;
+  --accent-dim:   rgba(45, 212, 191, 0.14);
+  --accent-faint: rgba(45, 212, 191, 0.06);
+  --accent-line:  rgba(45, 212, 191, 0.35);
+
+  /* Type */
+  --serif: 'Crimson Pro', Georgia, serif;
+  --sans:  'Inter', system-ui, sans-serif;
+  --mono:  'JetBrains Mono', monospace;
+
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  background: #0d0d0d;
-  color: #e8e6e1;
-  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
-#root { min-height: 100vh; }
+/* Atmospheric background gradients */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -10%, var(--accent-faint), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 90% 100%, var(--accent-faint), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root { position: relative; z-index: 1; min-height: 100vh; }
+
+::selection { background: var(--accent-dim); color: var(--accent-bright); }
+
+a { color: inherit; text-decoration: none; }
+
+/* ───── Type utilities ───── */
+.serif { font-family: var(--serif); }
+.sans  { font-family: var(--sans); }
+.mono  { font-family: var(--mono); }
+.uc    { text-transform: uppercase; letter-spacing: 0.14em; }
+.em-accent { color: var(--accent); }
+
+/* ───── Type scale ───── */
+.display {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 68px;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+}
+.display em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.display-sm {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+.display-sm em { font-style: italic; color: var(--accent); }
+
+.lede {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--text-soft);
+  max-width: 60ch;
+}
+.lede em { font-style: italic; color: var(--text); }
+
+.kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.kicker-soft { color: var(--text-faint); }
+
+.body-md {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+}
+.body-soft { color: var(--text-soft); }
+
+.label-mono {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ───── App layout ───── */
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 48px 64px;
+  min-height: 100vh;
+}
+
+/* ───── Animations ───── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.fade-in { animation: fade-in 0.3s ease; }
+
+/* ───── Responsive ───── */
+@media (max-width: 900px) {
+  .app { padding: 20px 22px 48px; }
+  .display { font-size: 44px; }
+  .display-sm { font-size: 28px; }
+}

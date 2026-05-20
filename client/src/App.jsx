@@ -1,12 +1,31 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth.jsx';
+import { RequireAuth, RedirectIfAuthed } from './components/AuthGuards.jsx';
+
+import Setup from './routes/Setup.jsx';
+import Folio from './routes/Folio.jsx';
+import Brief from './routes/Brief.jsx';
+import Dialogue from './routes/Dialogue.jsx';
+import Plan from './routes/Plan.jsx';
+import WalkReview from './routes/WalkReview.jsx';
+import Account from './routes/Account.jsx';
+
+import './styles/global.css';
+import './styles/components.css';
+
 export default function App() {
   return (
-    <div style={{ padding: 48 }}>
-      <h1 style={{ fontFamily: 'Crimson Pro, serif', fontWeight: 400, fontSize: 56, letterSpacing: '-0.02em' }}>
-        Latitude<span style={{ color: '#2dd4bf' }}>.</span>
-      </h1>
-      <p style={{ fontFamily: 'Inter, sans-serif', color: '#a0a0a0' }}>
-        Scaffold OK. Wiring up the rest in subsequent sessions.
-      </p>
-    </div>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/folio" replace />} />
+        <Route path="/setup"            element={<RedirectIfAuthed><Setup /></RedirectIfAuthed>} />
+        <Route path="/folio"            element={<RequireAuth><Folio /></RequireAuth>} />
+        <Route path="/brief"            element={<RequireAuth><Brief /></RequireAuth>} />
+        <Route path="/dialogue/:id"     element={<RequireAuth><Dialogue /></RequireAuth>} />
+        <Route path="/folio/walks/:id"  element={<RequireAuth><WalkReview /></RequireAuth>} />
+        <Route path="/account"          element={<RequireAuth><Account /></RequireAuth>} />
+        <Route path="*"                 element={<Navigate to="/folio" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }
