@@ -6,6 +6,5 @@ node_modules/
 dist/
 build/
 server/public/
-server/prisma/migrations/
 .vscode/
 .idea/

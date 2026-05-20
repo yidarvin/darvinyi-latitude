@@ -7,8 +7,111 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Placeholder model — full schema lands in Session 2.
-// Prisma generate errors without at least one model defined.
-model ScaffoldPlaceholder {
-  id Int @id @default(autoincrement())
+// ────────────────────────────────────────────────────────
+// User
+// ────────────────────────────────────────────────────────
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  // Encrypted Anthropic API key (AES-256-GCM)
+  apiKeyCipher    String     // base64
+  apiKeyNonce     String     // base64
+  apiKeyAuthTag   String     // base64
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  walks           Walk[]
+  agentRuns       AgentRun[]
+
+  @@index([email])
+}
+
+// ────────────────────────────────────────────────────────
+// Walk — a composed photography walking route
+// ────────────────────────────────────────────────────────
+model Walk {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identity
+  title           String     // e.g., "Edge Conditions"
+  subtitle        String     // e.g., "A study of seams · 6 frames · B&W"
+  brief           String     @db.Text
+
+  // Where + when
+  locationName    String     // e.g., "Mission District, San Francisco"
+  centerLat       Float
+  centerLng       Float
+  date            DateTime
+  timeOfDay       String     // 'dawn'|'morning'|'midday'|'golden'|'blue'|'night'
+
+  // Logistics
+  durationMin     Int
+  distanceM       Int        // walking distance in meters
+  cameraBody      String
+  lensSpec        String
+  mobility        String[]   // ['foot','transit','bike','ride']
+  styles          String[]   // ['street','architecture',...]
+  intent          String?    @db.Text
+
+  // Routing
+  walkingPolyline String?    @db.Text // encoded polyline from Mapbox
+  transitPolyline String?    @db.Text
+
+  // Composed narrative
+  conditions      Json       // { light, weather, camera_notes, afterward }
+
+  status          String     @default("composed") // 'draft'|'composed'|'completed'
+  createdAt       DateTime   @default(now())
+  composedAt      DateTime?
+
+  stops           Stop[]
+  agentRun        AgentRun?
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ────────────────────────────────────────────────────────
+// Stop — a single photo stop on a walk
+// ────────────────────────────────────────────────────────
+model Stop {
+  id              String     @id @default(cuid())
+  walkId          String
+  walk            Walk       @relation(fields: [walkId], references: [id], onDelete: Cascade)
+
+  ordinal         Int        // 1-indexed
+  name            String     // e.g., "Balmy Alley"
+  lat             Float
+  lng             Float
+  arrivalTime     String     // "10:25" — display string
+  durationMin     Int
+  brief           String     @db.Text
+
+  @@unique([walkId, ordinal])
+  @@index([walkId])
+}
+
+// ────────────────────────────────────────────────────────
+// AgentRun — one dialogue session with the agent
+// ────────────────────────────────────────────────────────
+model AgentRun {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  walkId          String?    @unique
+  walk            Walk?      @relation(fields: [walkId], references: [id], onDelete: SetNull)
+
+  briefSnapshot   Json
+  messages        Json       @default("[]")
+
+  status          String     @default("active") // 'active'|'awaiting_user'|'composed'|'error'|'abandoned'
+  errorMessage    String?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
 }
