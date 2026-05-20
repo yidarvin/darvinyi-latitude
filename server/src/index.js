@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { config } from './config.js';
 import healthRouter from './routes/health.js';
-import authRouter from './routes/auth.js';
+import authRouter  from './routes/auth.js';
+import walksRouter from './routes/walks.js';
+import folioRouter from './routes/folio.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +23,8 @@ app.use(cookieParser());
 // API routes
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
+app.use('/api', walksRouter);
+app.use('/api', folioRouter);
 
 // Serve client in production
 if (config.nodeEnv === 'production') {
