@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Placeholder model — full schema lands in Session 2.
+// Prisma generate errors without at least one model defined.
+model ScaffoldPlaceholder {
+  id Int @id @default(autoincrement())
+}
