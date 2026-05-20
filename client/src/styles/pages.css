@@ -1,0 +1,132 @@
+/* ─────────────────────────────────────────────────────
+   Latitude — page-specific styles
+   ───────────────────────────────────────────────────── */
+
+/* ════════════════════ Setup screen ════════════════════ */
+.setup-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 80px;
+  align-items: start;
+  margin-top: 32px;
+}
+.setup-intro .display { margin-bottom: 28px; }
+.setup-intro .lede    { margin-bottom: 36px; }
+
+.setup-bullets {
+  list-style: none;
+  border-top: 1px solid var(--border);
+  margin-top: 36px;
+}
+.setup-bullets li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-soft);
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 16px;
+  align-items: baseline;
+}
+.setup-bullets .b-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+}
+.setup-bullets .b-text {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--text);
+  font-weight: 400;
+}
+.setup-bullets .b-text em {
+  font-style: italic;
+  color: var(--text-soft);
+}
+
+.mode-toggle {
+  margin-top: 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  text-align: center;
+}
+.mode-toggle button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  padding: 0 0 1px;
+  border-bottom: 1px solid transparent;
+}
+.mode-toggle button:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* ════════════════════ Account screen ════════════════════ */
+.account-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 64px;
+  margin-top: 32px;
+  align-items: start;
+}
+
+.account-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+
+.account-meta-list {
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.account-meta-list li {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-soft);
+  align-items: baseline;
+}
+.account-meta-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.account-meta-value {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--text);
+}
+.account-meta-value.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.account-actions {
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ════════════════════ Responsive ════════════════════ */
+@media (max-width: 900px) {
+  .setup-grid,
+  .account-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .account-meta-list li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

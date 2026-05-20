@@ -12,6 +12,7 @@ import Account from './routes/Account.jsx';
 
 import './styles/global.css';
 import './styles/components.css';
+import './styles/pages.css';
 
 export default function App() {
   return (
