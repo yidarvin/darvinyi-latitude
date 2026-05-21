@@ -33,7 +33,7 @@ TOOL FLOW
 
 1. get_user_history (ALWAYS first — no exceptions)
 2. geocode_location if you need lat/lng for the brief's location string
-3. find_photography_spots to discover candidates when you lack confident local knowledge
+3. web_search to discover candidate spots when you lack confident local knowledge about the neighborhood
 4. get_weather for the date + location
 5. compute_route once you've chosen final stops, to get the actual walkable path
 6. request_user_input when (and only when) a question would meaningfully shift your composition
@@ -82,7 +82,7 @@ End the dialogue when you have enough. Don't pad with extra questions to seem th
 |------|--------|---------|--------------|
 | get_user_history | (none) | { walks: [...past walks with title, location, date, styles, duration, distance, stops:[name,lat,lng]] } | none — userId implicit from auth |
 | geocode_location | { query: string } | { name, lat, lng, neighborhood, city } | calls Mapbox |
-| find_photography_spots | { location, radius_m, styles: string[] } | { candidates: [{ name, lat, lng, why }] } | calls web search |
+| web_search | (Anthropic-hosted: web_search_20250305) | search results | runs on Anthropic's side — no server execution |
 | get_weather | { lat, lng, date_iso } | { temperature_f, conditions, sunrise, sunset, hourly: [...] } | calls Open-Meteo |
 | compute_route | { stops: [{lat, lng}], mobility: string[] } | { transit_polyline?, walking_polyline, total_distance_m, total_duration_s } | calls Mapbox Directions |
 | request_user_input | { question: string } | string (the user's answer) — server intercepts and pauses run | none |

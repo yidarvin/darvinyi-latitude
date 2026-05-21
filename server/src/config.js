@@ -9,6 +9,7 @@ const schema = z.object({
   PORT: z.coerce.number().default(3000),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
   COOKIE_DOMAIN: z.string().optional(),
+  MAPBOX_TOKEN: z.string().min(20, 'MAPBOX_TOKEN is required'),
 });
 
 const env = schema.parse(process.env);
@@ -21,5 +22,6 @@ export const config = {
   port:                  env.PORT,
   clientOrigin:          env.CLIENT_ORIGIN,
   cookieDomain:          env.COOKIE_DOMAIN,
+  mapboxToken:           env.MAPBOX_TOKEN,
   isProd:                env.NODE_ENV === 'production',
 };
