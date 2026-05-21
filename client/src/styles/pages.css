@@ -302,3 +302,92 @@
   .folio-stats { gap: 24px; text-align: left; }
   .insight-card { grid-template-columns: 1fr; }
 }
+
+/* ════════════════════ Brief screen ════════════════════ */
+.brief-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 40px;
+}
+.brief-head-meta {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  line-height: 1.8;
+}
+.brief-head-meta b { color: var(--text); font-weight: 500; }
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 56px;
+  row-gap: 30px;
+  margin-bottom: 40px;
+}
+.field-full { grid-column: 1 / -1; }
+
+.field-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-bright);
+  transition: border-color 0.2s;
+}
+.field-row:focus-within { border-color: var(--accent); }
+.field-row .form-input { border-bottom: none; }
+.field-aux {
+  align-self: stretch;
+  display: flex; align-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.field-aux:hover { background: var(--accent-faint); }
+
+.lens-fixed-display {
+  padding: 10px 0 8px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 17px;
+  color: var(--text-soft);
+  border-bottom: 1px solid var(--border-bright);
+}
+
+.brief-note {
+  background: var(--surface);
+  border-left: 2px solid var(--accent);
+  padding: 16px 22px;
+  margin-bottom: 32px;
+}
+.brief-note-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.brief-note-text {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.brief-note-text em { font-style: italic; color: var(--text-soft); }
+
+@media (max-width: 900px) {
+  .brief-grid { grid-template-columns: 1fr; column-gap: 0; }
+}
