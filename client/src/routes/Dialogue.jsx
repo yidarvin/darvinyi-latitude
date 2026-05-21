@@ -5,6 +5,9 @@ import StepIndicator from '../components/StepIndicator.jsx';
 import LoadingDot from '../components/LoadingDot.jsx';
 import * as walksApi from '../api/walks.js';
 import * as agentRunsApi from '../api/agentRuns.js';
+import { abortRun } from '../api/agentRuns.js';
+import { submitBriefDraft } from '../api/walks.js';
+import Button from '../components/Button.jsx';
 import { useAgentStream } from '../hooks/useAgentStream.js';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
 import { formatDate } from '../lib/walkLabels.js';
@@ -30,6 +33,39 @@ export default function Dialogue() {
   const [run, setRun]               = useState(null);
   const [pastWalks, setPastWalks]   = useState(null);
   const [loadError, setLoadError]   = useState(null);
+  const [aborting, setAborting]     = useState(false);
+
+  const handleAbort = async () => {
+    if (aborting) return;
+    if (!confirm('Stop this walk and discard the draft?')) return;
+    setAborting(true);
+    try {
+      await abortRun(id);
+      navigate('/folio', { replace: true });
+    } catch {
+      setAborting(false);
+    }
+  };
+
+  const handleRestart = async () => {
+    if (!run?.briefSnapshot) return;
+    const b = run.briefSnapshot;
+    try {
+      const res = await submitBriefDraft({
+        locationName: b.locationName,
+        durationId:   b.durationId,
+        timeOfDay:    b.timeOfDay,
+        cameraId:     b.cameraId,
+        lensIds:      b.lensIds || [],
+        mobility:     b.mobility,
+        styles:       b.styles,
+        intent:       b.intent || '',
+      });
+      navigate(`/dialogue/${res.agentRunId}`, { replace: true });
+    } catch {
+      navigate('/brief');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +152,14 @@ export default function Dialogue() {
               ))
             )}
           </div>
+
+          {!stream.composed && (
+            <div className="dialogue-actions">
+              <Button variant="ghost" onClick={handleAbort} disabled={aborting}>
+                {aborting ? 'Stopping…' : 'Stop walk'}
+              </Button>
+            </div>
+          )}
         </aside>
 
         <div className="transcript">
@@ -151,8 +195,12 @@ export default function Dialogue() {
           {stream.error && (
             <div className="turn">
               <div className="turn-who" style={{ color: '#f87171' }}>Error</div>
-              <div className="turn-msg" style={{ color: '#f87171', fontSize: 16 }}>
+              <div className="turn-msg" style={{ color: '#f87171', fontSize: 16, marginBottom: 12 }}>
                 {stream.error}
+              </div>
+              <div className="dialogue-error-actions">
+                <Button onClick={handleRestart}>Try again</Button>
+                <Button variant="ghost" onClick={() => navigate('/folio')}>Back to folio</Button>
               </div>
             </div>
           )}

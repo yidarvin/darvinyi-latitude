@@ -9,6 +9,7 @@ import authRouter  from './routes/auth.js';
 import walksRouter from './routes/walks.js';
 import folioRouter from './routes/folio.js';
 import agentRunsRouter from './routes/agentRuns.js';
+import utilRouter from './routes/util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,7 @@ app.use('/api', authRouter);
 app.use('/api', walksRouter);
 app.use('/api', folioRouter);
 app.use('/api', agentRunsRouter);
+app.use('/api', utilRouter);
 
 // Serve client in production
 if (config.nodeEnv === 'production') {

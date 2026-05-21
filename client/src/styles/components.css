@@ -347,6 +347,16 @@ textarea.form-input {
   .footer-meta, .footer-right { text-align: left; }
 }
 
+@media (max-width: 480px) {
+  /* Bigger tap targets on phone */
+  .chip { padding: 10px 14px; min-height: 36px; }
+  .btn { padding: 14px 20px; min-height: 36px; }
+  .form-card { padding: 24px 20px 22px; }
+  .step { padding: 14px 6px; }
+  .step-label { font-size: 13px; }
+  .nav-links { font-size: 10px; gap: 14px; flex-wrap: wrap; }
+}
+
 /* ───── Loading dot ───── */
 .loading-dot {
   width: 100vw;
@@ -360,4 +370,15 @@ textarea.form-input {
   border-radius: 50%;
   box-shadow: 0 0 16px var(--accent);
   animation: pulse 1.6s ease infinite;
+}
+
+/* ───── Skeleton loader ───── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }

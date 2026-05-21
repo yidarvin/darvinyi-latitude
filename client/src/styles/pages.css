@@ -303,6 +303,15 @@
   .insight-card { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 480px) {
+  .folio-stats { gap: 18px; flex-wrap: wrap; }
+  .folio-stats .stat-num { font-size: 22px; }
+  .insight-card { padding: 20px 18px; }
+  .walks-grid { grid-template-columns: 1fr; gap: 16px; }
+  .folio-empty { padding: 40px 24px; }
+  .folio-section-head { flex-wrap: wrap; gap: 8px; }
+}
+
 /* ════════════════════ Brief screen ════════════════════ */
 .brief-head {
   display: grid;
@@ -390,6 +399,13 @@
 
 @media (max-width: 900px) {
   .brief-grid { grid-template-columns: 1fr; column-gap: 0; }
+}
+
+@media (max-width: 480px) {
+  .brief-head { grid-template-columns: 1fr; }
+  .brief-head-meta { text-align: left; }
+  .field-aux { padding: 0 14px; font-size: 10px; min-height: 40px; }
+  .brief-grid { row-gap: 22px; margin-bottom: 28px; }
 }
 
 /* ════════════════════ Dialogue screen ════════════════════ */
@@ -588,6 +604,14 @@
     padding: 0 0 24px;
     position: static;
   }
+}
+
+@media (max-width: 480px) {
+  .turn-msg { font-size: 17px; }
+  .turn-input { flex-direction: column; }
+  .turn-input button { padding: 14px; min-height: 44px; }
+  .turn-input input { padding: 12px 14px; }
+  .dialogue-actions, .dialogue-error-actions { flex-wrap: wrap; }
 }
 
 /* ════════════════════ Plan screen ════════════════════ */
@@ -820,4 +844,25 @@
   .conditions-row { grid-template-columns: 1fr; gap: 4px; }
   .shotlist-item { grid-template-columns: 36px 1fr; }
   .shotlist-meta { grid-column: 2; text-align: left; margin-top: 6px; }
+}
+
+@media (max-width: 480px) {
+  .plan-head { grid-template-columns: 1fr; }
+  .plan-map { height: 360px; }
+  .plan-wrap { gap: 24px; }
+  .conditions { padding: 14px 16px; }
+  .plan-actions { flex-wrap: wrap; }
+}
+
+.dialogue-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.dialogue-error-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
 }

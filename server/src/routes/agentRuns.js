@@ -100,6 +100,28 @@ router.post('/agent-runs/:id/reply', requireAuth, async (req, res, next) => {
 });
 
 /**
+ * POST /api/agent-runs/:id/abort
+ * Marks an active or awaiting_user run as abandoned. Client should then
+ * navigate away. Composed runs cannot be aborted.
+ */
+router.post('/agent-runs/:id/abort', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const run = await prisma.agentRun.findFirst({
+    where: { id, userId: req.user.id },
+    select: { id: true, status: true },
+  });
+  if (!run) return res.status(404).json({ error: 'Run not found' });
+  if (run.status === 'composed') {
+    return res.status(400).json({ error: 'Cannot abort a composed run' });
+  }
+  await prisma.agentRun.update({
+    where: { id },
+    data:  { status: 'abandoned' },
+  });
+  res.json({ ok: true });
+});
+
+/**
  * GET /api/agent-runs/:id
  * Small endpoint for the dialogue UI to know the run's current state
  * without opening a stream.

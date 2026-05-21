@@ -3,16 +3,12 @@ import { prisma } from '../db.js';
 
 const router = Router();
 
-router.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'latitude', time: new Date().toISOString() });
-});
-
-router.get('/db-health', async (req, res, next) => {
+router.get('/health', async (req, res) => {
   try {
-    const result = await prisma.$queryRaw`SELECT 1 as ok`;
-    res.json({ ok: true, db: result });
-  } catch (err) {
-    next(err);
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, ts: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ ok: false });
   }
 });
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import {
   CAMERAS, MIRRORLESS_LENSES, STYLE_OPTIONS, TOD_OPTIONS,
   MOBILITY_OPTIONS, DURATIONS, findCamera, findDuration,
@@ -87,7 +88,10 @@ router.get('/walks/:id', requireAuth, async (req, res, next) => {
  * Creates an AgentRun seeded with the validated brief.
  * Does NOT create a Walk row — that happens when the agent calls compose_walk.
  */
-router.post('/walks/draft', requireAuth, async (req, res, next) => {
+router.post('/walks/draft',
+  requireAuth,
+  rateLimit('draft', 10, 60 * 60 * 1000),
+  async (req, res, next) => {
   try {
     const brief = briefSchema.parse(req.body);
 
@@ -113,6 +117,7 @@ router.post('/walks/draft', requireAuth, async (req, res, next) => {
       cameraId:     brief.cameraId,
       cameraType:   camera.type,
       cameraLabel:  camera.label.split(' · ')[0],
+      lensIds:      brief.lensIds || [],
       lensSpec,
       mobility:     brief.mobility,
       styles:       brief.styles,
@@ -137,6 +142,7 @@ router.post('/walks/draft', requireAuth, async (req, res, next) => {
     }
     next(err);
   }
-});
+}
+);
 
 export default router;

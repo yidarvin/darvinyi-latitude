@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as authApi from '../api/auth.js';
 import { useAuth } from '../hooks/useAuth.jsx';
@@ -21,6 +21,9 @@ export default function Setup() {
 
   const { refresh } = useAuth();
   const navigate = useNavigate();
+  const firstInputRef = useRef(null);
+
+  useEffect(() => { firstInputRef.current?.focus(); }, []);
 
   const isSignup = mode === 'signup';
 
@@ -99,6 +102,7 @@ export default function Setup() {
           </div>
 
           <Input
+            ref={firstInputRef}
             label="Email Address"
             type="email"
             autoComplete="email"

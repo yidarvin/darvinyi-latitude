@@ -6,6 +6,7 @@ import TopNav from '../components/TopNav.jsx';
 import Button from '../components/Button.jsx';
 import WalkThumb from '../components/WalkThumb.jsx';
 import LoadingDot from '../components/LoadingDot.jsx';
+import { SkeletonLine, SkeletonBlock } from '../components/Skeleton.jsx';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
 import { styleLabel, todLabel, formatDate, formatKm } from '../lib/walkLabels.js';
 
@@ -51,7 +52,26 @@ export default function Folio() {
     return (
       <div className="app">
         <TopNav />
-        <LoadingDot />
+        <div className="folio-head">
+          <div>
+            <SkeletonLine width={180} height={11} style={{ marginBottom: 14 }} />
+            <SkeletonLine width={420} height={36} />
+          </div>
+        </div>
+        <SkeletonBlock height={120} style={{ marginBottom: 44 }} />
+        <SkeletonLine width={140} height={22} style={{ marginBottom: 22 }} />
+        <div className="walks-grid">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="walk-card" style={{ cursor: 'default' }}>
+              <SkeletonBlock height={130} />
+              <div className="walk-body">
+                <SkeletonLine width="70%" height={20} style={{ marginBottom: 8 }} />
+                <SkeletonLine width="40%" height={11} style={{ marginBottom: 14 }} />
+                <SkeletonLine width="50%" height={14} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

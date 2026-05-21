@@ -6,6 +6,7 @@ import TopNav from '../components/TopNav.jsx';
 import StepIndicator from '../components/StepIndicator.jsx';
 import Button from '../components/Button.jsx';
 import LoadingDot from '../components/LoadingDot.jsx';
+import { SkeletonLine, SkeletonBlock } from '../components/Skeleton.jsx';
 import * as walksApi from '../api/walks.js';
 import { makeStopIcon } from '../lib/mapMarkers.js';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
@@ -69,7 +70,25 @@ export default function Plan() {
     return (
       <div className="app">
         <TopNav />
-        <LoadingDot />
+        <div className="plan-head">
+          <div>
+            <SkeletonLine width={140} height={11} style={{ marginBottom: 14 }} />
+            <SkeletonLine width={360} height={36} />
+          </div>
+        </div>
+        <div className="plan-wrap">
+          <SkeletonBlock height={720} />
+          <div>
+            <SkeletonLine width="80%" height={32} style={{ marginBottom: 14 }} />
+            <SkeletonLine width="50%" height={11} style={{ marginBottom: 24 }} />
+            <SkeletonBlock height={80} style={{ marginBottom: 28 }} />
+            <SkeletonBlock height={200} style={{ marginBottom: 28 }} />
+            <SkeletonLine width="40%" height={22} style={{ marginBottom: 18 }} />
+            {[0,1,2,3].map(i => (
+              <SkeletonLine key={i} width="100%" height={48} style={{ marginBottom: 10 }} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

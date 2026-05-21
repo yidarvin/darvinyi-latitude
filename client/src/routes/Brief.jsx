@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as walksApi from '../api/walks.js';
 import TopNav from '../components/TopNav.jsx';
@@ -101,6 +101,9 @@ export default function Brief() {
   const [error, setError]           = useState(null);
   const [locating, setLocating]     = useState(false);
   const navigate = useNavigate();
+  const firstInputRef = useRef(null);
+
+  useEffect(() => { firstInputRef.current?.focus(); }, []);
 
   const camera = useMemo(
     () => CAMERAS.find(c => c.id === form.cameraId) || CAMERAS[0],
@@ -109,12 +112,34 @@ export default function Brief() {
 
   const update = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
-  const useMyLocation = () => {
+  const useMyLocation = async () => {
+    if (!('geolocation' in navigator)) {
+      setError('Geolocation isn\'t supported in this browser.');
+      return;
+    }
     setLocating(true);
-    setTimeout(() => {
-      update('locationName', 'San Francisco, CA');
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 8000,
+          maximumAge: 60_000,
+          enableHighAccuracy: false,
+        });
+      });
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(`/api/util/reverse-geocode?lat=${latitude}&lng=${longitude}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Reverse geocode failed');
+      const { name } = await res.json();
+      update('locationName', name);
+    } catch (err) {
+      if (err.code === 1) setError('Location permission denied.');
+      else if (err.code === 3) setError('Location request timed out.');
+      else setError(err.message || 'Could not determine your location.');
+    } finally {
       setLocating(false);
-    }, 500);
+    }
   };
 
   const isValid =
@@ -171,6 +196,7 @@ export default function Brief() {
           <label className="form-label">Location</label>
           <div className="field-row">
             <input
+              ref={firstInputRef}
               className="form-input"
               type="text"
               placeholder="Neighborhood, city"
