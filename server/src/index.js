@@ -15,6 +15,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
+if (config.isProd) {
+  // Trust Railway's edge proxy so req.protocol, req.ip, and secure cookies behave correctly.
+  app.set('trust proxy', 1);
+}
+
 app.use(cors({
   origin: config.clientOrigin,
   credentials: true,

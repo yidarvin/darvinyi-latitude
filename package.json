@@ -8,6 +8,7 @@
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev:server\" \"npm run dev:client\"",
     "build": "npm --prefix client run build && cp -r client/dist server/public",
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "postinstall": "npm --prefix server install && npm --prefix client install",
     "start": "npm --prefix server run start"
   },
   "devDependencies": {
