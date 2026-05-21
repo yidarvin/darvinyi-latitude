@@ -589,3 +589,235 @@
     position: static;
   }
 }
+
+/* ════════════════════ Plan screen ════════════════════ */
+.plan-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: end;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.plan-stamp {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: var(--accent-faint);
+}
+.plan-stamp::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.plan-wrap {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 32px;
+  align-items: stretch;
+}
+
+/* Map column */
+.plan-map {
+  position: relative;
+  height: 720px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.plan-map .leaflet-container {
+  width: 100%; height: 100%;
+  background: var(--bg-elev);
+  font-family: var(--mono);
+}
+/* Override Leaflet's default ugly attribution */
+.plan-map .leaflet-control-attribution {
+  background: rgba(13,13,13,0.85);
+  color: var(--text-faint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border: 1px solid var(--border-soft);
+}
+.plan-map .leaflet-control-attribution a {
+  color: var(--text-soft);
+}
+
+/* Numbered stop marker */
+.lat-stop-icon {
+  background: transparent;
+  border: none;
+}
+.lat-stop-icon-inner {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.55);
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.lat-stop-icon-inner:hover,
+.lat-stop-icon-inner.is-active {
+  transform: scale(1.18);
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.85);
+}
+
+/* Project sidebar */
+.plan-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* allow text wrapping */
+}
+.project-head {
+  margin-bottom: 22px;
+}
+.project-title {
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.0;
+  letter-spacing: -0.015em;
+  margin-bottom: 8px;
+}
+.project-title em { font-style: italic; color: var(--accent); }
+.project-subtitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+.project-brief {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 300;
+  line-height: 1.5;
+  color: var(--text-soft);
+  border-left: 2px solid var(--accent);
+  padding-left: 16px;
+  margin-bottom: 28px;
+}
+.project-brief em { font-style: italic; color: var(--text); }
+
+.conditions {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 18px 22px;
+  margin-bottom: 32px;
+}
+.conditions-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 16px;
+  align-items: baseline;
+}
+.conditions-row:last-child { border-bottom: none; }
+.conditions-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.conditions-text {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.conditions-text em { font-style: italic; color: var(--accent); }
+
+.shotlist-title {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.shotlist-title em { font-style: italic; color: var(--accent); }
+
+.shotlist {
+  list-style: none;
+}
+.shotlist-item {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.shotlist-item:hover { background: var(--surface); }
+.shotlist-item.is-active { background: var(--surface); }
+.shotlist-item:last-child { border-bottom: none; }
+.shotlist-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  padding-top: 2px;
+}
+.shotlist-body { min-width: 0; }
+.shotlist-name {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--text);
+  margin-bottom: 4px;
+  font-weight: 400;
+}
+.shotlist-brief {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+.shotlist-meta {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  text-align: right;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.shotlist-meta b { color: var(--text-soft); font-weight: 500; }
+
+.plan-actions {
+  margin-top: 32px;
+  display: flex;
+  gap: 12px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 1100px) {
+  .plan-wrap { grid-template-columns: 1fr; }
+  .plan-map { height: 480px; }
+}
+@media (max-width: 900px) {
+  .conditions-row { grid-template-columns: 1fr; gap: 4px; }
+  .shotlist-item { grid-template-columns: 36px 1fr; }
+  .shotlist-meta { grid-column: 2; text-align: left; margin-top: 6px; }
+}
