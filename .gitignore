@@ -8,3 +8,4 @@ build/
 server/public/
 .vscode/
 .idea/
+.playwright-mcp/
