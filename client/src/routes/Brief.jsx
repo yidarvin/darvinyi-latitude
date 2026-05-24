@@ -71,6 +71,11 @@ const MOBILITY_OPTIONS = [
   { value: 'ride',    label: '⎈ Car / Rideshare' },
 ];
 
+const ROUTE_SHAPE_OPTIONS = [
+  { value: 'line', label: '→ One way — point to point' },
+  { value: 'loop', label: '↻ Round trip — start & finish together' },
+];
+
 const STYLE_OPTIONS = [
   { value: 'street',      label: 'Street' },
   { value: 'documentary', label: 'Documentary' },
@@ -91,6 +96,7 @@ const INITIAL = {
   cameraId:     'fuji-x100vi',
   lensIds:      [],
   mobility:     ['foot', 'transit'],
+  routeShape:   'line',
   styles:       ['street', 'arch'],
   intent:       '',
 };
@@ -164,6 +170,7 @@ export default function Brief() {
         lensIds:      camera.type === 'mirrorless' ? form.lensIds : [],
         mobility:     form.mobility,
         styles:       form.styles,
+        roundTrip:    form.routeShape === 'loop',
         intent:       form.intent.trim(),
       });
       navigate(`/dialogue/${res.agentRunId}`);
@@ -290,6 +297,18 @@ export default function Brief() {
             value={form.mobility}
             onChange={(v) => update('mobility', v)}
             mode="multi"
+          />
+        </div>
+
+        <div className="field field-full">
+          <label className="form-label">
+            Route shape <span className="form-label-aux">— how the walk is laid out</span>
+          </label>
+          <ChipGroup
+            options={ROUTE_SHAPE_OPTIONS}
+            value={form.routeShape}
+            onChange={(v) => update('routeShape', v)}
+            mode="single"
           />
         </div>
 

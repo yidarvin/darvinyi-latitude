@@ -246,6 +246,34 @@
   padding: 4px 8px;
   border: 1px solid var(--border);
 }
+.walk-delete {
+  position: absolute;
+  top: 10px; left: 10px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-soft);
+  background: rgba(13,13,13,0.7);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.18s, color 0.18s, border-color 0.18s, background 0.18s;
+}
+.walk-card:hover .walk-delete,
+.walk-delete:focus-visible { opacity: 1; }
+.walk-delete:hover {
+  color: #f87171;
+  border-color: #f87171;
+  background: rgba(13,13,13,0.85);
+}
+.walk-delete:disabled { cursor: default; opacity: 1; color: var(--text-faint); }
+/* Touch devices can't hover — keep the control reachable. */
+@media (hover: none) {
+  .walk-delete { opacity: 1; }
+}
+
 .walk-body { padding: 18px 20px 20px; flex: 1; display: flex; flex-direction: column; }
 .walk-title {
   font-family: var(--serif);

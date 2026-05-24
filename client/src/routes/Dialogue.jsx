@@ -59,6 +59,7 @@ export default function Dialogue() {
         lensIds:      b.lensIds || [],
         mobility:     b.mobility,
         styles:       b.styles,
+        roundTrip:    b.roundTrip || false,
         intent:       b.intent || '',
       });
       navigate(`/dialogue/${res.agentRunId}`, { replace: true });

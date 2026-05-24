@@ -17,6 +17,7 @@ export default function Folio() {
   const [walks, setWalks] = useState(null);
   const [insight, setInsight] = useState(null);
   const [error, setError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +37,31 @@ export default function Folio() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const handleDelete = async (e, walk) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (deletingId) return;
+    const ok = window.confirm(
+      `Delete "${walk.title}"? Its photo stops become fair game for future walks. This can't be undone.`
+    );
+    if (!ok) return;
+
+    setDeletingId(walk.id);
+    try {
+      await walksApi.deleteWalk(walk.id);
+      // Drop it locally, then refresh the insight + stats so they stay accurate.
+      setWalks(prev => prev.filter(w => w.id !== walk.id));
+      try {
+        const insightRes = await walksApi.getFolioInsight();
+        setInsight(insightRes);
+      } catch { /* stats refresh is best-effort */ }
+    } catch (err) {
+      setError(err.message || 'Failed to delete walk');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (error) {
     return (
@@ -124,6 +150,16 @@ export default function Folio() {
                 <div className="walk-thumb">
                   <WalkThumb stops={w.stops} />
                   <div className="walk-meta-overlay">{formatDate(w.date)}</div>
+                  <button
+                    type="button"
+                    className="walk-delete"
+                    title="Delete walk"
+                    aria-label={`Delete ${w.title}`}
+                    disabled={deletingId === w.id}
+                    onClick={(e) => handleDelete(e, w)}
+                  >
+                    {deletingId === w.id ? '···' : '✕'}
+                  </button>
                 </div>
                 <div className="walk-body">
                   <div className="walk-title">{renderEmphasis(emphasizeTitle(w.title))}</div>

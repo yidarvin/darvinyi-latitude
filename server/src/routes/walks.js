@@ -22,6 +22,7 @@ const briefSchema = z.object({
   lensIds:      z.array(z.string()).optional().default([]),
   mobility:     z.array(z.enum(MOBILITY_OPTIONS)).min(1, 'Choose at least one mobility option'),
   styles:       z.array(z.enum(STYLE_OPTIONS)).min(1, 'Choose at least one style'),
+  roundTrip:    z.boolean().optional().default(false),
   intent:       z.string().max(500).optional().default(''),
 });
 
@@ -84,6 +85,31 @@ router.get('/walks/:id', requireAuth, async (req, res, next) => {
 });
 
 /**
+ * DELETE /api/walks/:id
+ * Permanently remove a walk from the user's folio. Stops cascade-delete, and
+ * the linked AgentRun's walkId is set null. After deletion the walk no longer
+ * appears in get_user_history, so its stops become fair game for future walks.
+ */
+router.delete('/walks/:id', requireAuth, async (req, res, next) => {
+  try {
+    const walk = await prisma.walk.findFirst({
+      where: { id: req.params.id, userId: req.user.id },
+      select: { id: true },
+    });
+
+    if (!walk) {
+      return res.status(404).json({ error: 'Walk not found' });
+    }
+
+    await prisma.walk.delete({ where: { id: walk.id } });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/walks/draft
  * Creates an AgentRun seeded with the validated brief.
  * Does NOT create a Walk row — that happens when the agent calls compose_walk.
@@ -121,6 +147,7 @@ router.post('/walks/draft',
       lensSpec,
       mobility:     brief.mobility,
       styles:       brief.styles,
+      roundTrip:    brief.roundTrip,
       intent:       brief.intent || null,
       submittedAt:  new Date().toISOString(),
     };

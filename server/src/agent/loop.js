@@ -229,6 +229,9 @@ function buildInitialUserMessage(brief) {
     `Lens:          ${brief.lensSpec}`,
     `Mobility:      ${mobility}`,
     `Styles open to: ${styles}`,
+    `Route shape:   ${brief.roundTrip
+      ? 'Round trip — start and finish at the SAME point, with photo stops distributed all through the loop'
+      : 'One way — point to point'}`,
     brief.intent ? `Intent:        ${brief.intent}` : null,
     ``,
     `Today is ${new Date().toISOString().slice(0, 10)}.`,
