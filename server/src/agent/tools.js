@@ -89,7 +89,7 @@ export const TOOL_DEFS = [
         timeOfDay:        { type: 'string', enum: ['dawn','morning','midday','golden','blue','night'] },
         durationMin:      { type: 'integer' },
         distanceM:        { type: 'integer' },
-        walkingPolyline:  { type: 'string' },
+        walkingPolyline:  { type: 'string', description: 'Optional. Leave blank — the server draws the walking route from your stop coordinates. Only provide as a fallback.' },
         transitPolyline:  { type: 'string' },
         stops: {
           type: 'array',
@@ -121,7 +121,7 @@ export const TOOL_DEFS = [
         },
       },
       required: ['title','subtitle','brief','centerLat','centerLng','timeOfDay',
-                 'durationMin','distanceM','walkingPolyline','stops','conditions'],
+                 'durationMin','distanceM','stops','conditions'],
     },
   },
 ];
@@ -219,6 +219,60 @@ async function handleComputeRoute(input) {
 }
 
 /**
+ * Build the walking polyline + total walking distance for a composed walk.
+ *
+ * We recompute the route server-side from the (authoritative) stop coordinates
+ * instead of trusting `composed.walkingPolyline`. The agent only reaches us
+ * through a text channel, and an encoded polyline is a long opaque string the
+ * model cannot reproduce verbatim — transcribing it corrupts the geometry into
+ * a jagged path that no longer follows real streets. It's worst on round trips,
+ * whose return leg makes the string longer and the corruption more visible. The
+ * stops themselves survive the trip (short structured numbers), so rebuilding
+ * the route from them keeps the drawn line glued to the markers.
+ *
+ * @param {object} composed       validated compose_walk input (has .stops)
+ * @param {object} briefSnapshot  original brief (has .roundTrip)
+ * @returns {Promise<{ polyline: string, distanceM: number }>}
+ */
+async function resolveWalkingRoute(composed, briefSnapshot) {
+  const ordered = [...composed.stops]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .map(s => ({ lat: s.lat, lng: s.lng }));
+
+  // For a round trip the walk returns to its origin. The agent is told to make
+  // the final stop coincide with the first; if it didn't, append the origin so
+  // Mapbox routes the closing leg and the loop visibly closes.
+  let routeStops = ordered;
+  if (briefSnapshot?.roundTrip && ordered.length >= 2) {
+    const first = ordered[0];
+    const last  = ordered[ordered.length - 1];
+    if (first.lat !== last.lat || first.lng !== last.lng) {
+      routeStops = [...ordered, first];
+    }
+  }
+
+  try {
+    const route = await walkingDirections(routeStops);
+    return { polyline: route.polyline, distanceM: route.distance_m };
+  } catch {
+    // Mapbox hiccup — fall back to whatever the agent supplied so compose still
+    // succeeds, but only if it decodes to a usable polyline.
+    if (!composed.walkingPolyline) {
+      throw new Error('Could not compute a walking route for the stops');
+    }
+    try {
+      polyline.decode(composed.walkingPolyline);
+    } catch {
+      throw new Error('Could not compute a walking route and the fallback polyline was invalid');
+    }
+    return {
+      polyline:  composed.walkingPolyline,
+      distanceM: composed.distanceM,
+    };
+  }
+}
+
+/**
  * Persist a composed walk to the database.
  * Called by the agent loop, NOT routed through executeTool.
  *
@@ -229,11 +283,7 @@ async function handleComputeRoute(input) {
  * @returns {Promise<string>} walkId
  */
 export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, composed) {
-  try {
-    polyline.decode(composed.walkingPolyline);
-  } catch {
-    throw new Error('walkingPolyline is not a valid encoded polyline');
-  }
+  const { polyline: walkingPolyline, distanceM } = await resolveWalkingRoute(composed, briefSnapshot);
 
   const walk = await prisma.walk.create({
     data: {
@@ -247,13 +297,13 @@ export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, c
       date:         new Date(),
       timeOfDay:    composed.timeOfDay,
       durationMin:  composed.durationMin,
-      distanceM:    composed.distanceM,
+      distanceM,
       cameraBody:   briefSnapshot.cameraLabel,
       lensSpec:     briefSnapshot.lensSpec,
       mobility:     briefSnapshot.mobility,
       styles:       briefSnapshot.styles,
       intent:       briefSnapshot.intent || null,
-      walkingPolyline: composed.walkingPolyline,
+      walkingPolyline,
       transitPolyline: composed.transitPolyline || null,
       conditions:   composed.conditions,
       status:       'composed',
@@ -293,11 +343,7 @@ export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, c
  * @param {object} composed       the validated input of the compose_walk tool call
  */
 export async function updateWalkFromCompose(walkId, briefSnapshot, composed) {
-  try {
-    polyline.decode(composed.walkingPolyline);
-  } catch {
-    throw new Error('walkingPolyline is not a valid encoded polyline');
-  }
+  const { polyline: walkingPolyline, distanceM } = await resolveWalkingRoute(composed, briefSnapshot);
 
   await prisma.$transaction([
     prisma.stop.deleteMany({ where: { walkId } }),
@@ -311,8 +357,8 @@ export async function updateWalkFromCompose(walkId, briefSnapshot, composed) {
         centerLng:    composed.centerLng,
         timeOfDay:    composed.timeOfDay,
         durationMin:  composed.durationMin,
-        distanceM:    composed.distanceM,
-        walkingPolyline: composed.walkingPolyline,
+        distanceM,
+        walkingPolyline,
         transitPolyline: composed.transitPolyline || null,
         conditions:   composed.conditions,
         composedAt:   new Date(),
