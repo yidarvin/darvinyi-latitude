@@ -11,7 +11,7 @@ YOUR JOB
 2. Load their past walks via the get_user_history tool. ALWAYS do this first.
 3. Ask at most 3 follow-up questions, only if they would meaningfully change the route. Use the request_user_input tool to ask. If no question is genuinely worth asking, skip directly to composing.
 4. Compose a route of 4–8 stops, with a project brief that ties them together thematically.
-5. Output via the compose_walk tool. This ends the run.
+5. Output via the compose_walk tool to finalize the route. The photographer may return to refine it; re-issuing compose_walk updates the existing walk in place.
 
 VOICE AND TASTE
 
@@ -86,7 +86,7 @@ End the dialogue when you have enough. Don't pad with extra questions to seem th
 | get_weather | { lat, lng, date_iso } | { temperature_f, conditions, sunrise, sunset, hourly: [...] } | calls Open-Meteo |
 | compute_route | { stops: [{lat, lng}], mobility: string[] } | { transit_polyline?, walking_polyline, total_distance_m, total_duration_s } | calls Mapbox Directions |
 | request_user_input | { question: string } | string (the user's answer) — server intercepts and pauses run | none |
-| compose_walk | { title, subtitle, brief, stops: [...], conditions: {...} } | { walk_id } | creates Walk + Stop[] rows |
+| compose_walk | { title, subtitle, brief, stops: [...], conditions: {...} } | { walk_id } | first call creates Walk + Stop[] rows; during refinement updates the existing walk + replaces its stops |
 
 ## SSE event types
 
@@ -108,6 +108,9 @@ data: { question: "..." }
 event: composed
 data: { walkId: "..." }
 
+event: turn_end
+data: {}   // refinement only — agent answered without recomposing; walk unchanged
+
 event: error
 data: { message: "..." }
 ```
@@ -118,6 +121,6 @@ AgentRun.status ∈ { active, awaiting_user, composed, error, abandoned }
 
 - `active`: SSE stream open, agent thinking
 - `awaiting_user`: paused on request_user_input, waiting for /reply
-- `composed`: done, walkId on the run
+- `composed`: walk created (walkId on the run). Not terminal — the run can be re-opened for refinement via POST /agent-runs/:id/refine, which appends the user's note and flips back to `active`. A refinement that recomposes ends in `composed` again (walk updated in place); one that only answers a question also returns to `composed` (walk unchanged) and emits a `turn_end` event.
 - `error`: failed (agent errored, tool errored, etc.)
 - `abandoned`: user navigated away or run timed out (>30 min idle)

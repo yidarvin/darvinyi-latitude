@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import polyline from '@mapbox/polyline';
@@ -7,6 +7,7 @@ import StepIndicator from '../components/StepIndicator.jsx';
 import Button from '../components/Button.jsx';
 import LoadingDot from '../components/LoadingDot.jsx';
 import { SkeletonLine, SkeletonBlock } from '../components/Skeleton.jsx';
+import RefinePanel from '../components/RefinePanel.jsx';
 import * as walksApi from '../api/walks.js';
 import { makeStopIcon } from '../lib/mapMarkers.js';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
@@ -39,6 +40,15 @@ export default function Plan() {
       }
     })();
     return () => { cancelled = true; };
+  }, [id]);
+
+  // Re-fetch after the agent refines, so the map + shotlist reflect the update.
+  const reloadWalk = useCallback(async () => {
+    try {
+      const res = await walksApi.getWalk(id);
+      setWalk(res.walk);
+      setActiveStop(null);
+    } catch { /* keep showing the prior version */ }
   }, [id]);
 
   const walkingPath = useMemo(() => {
@@ -213,6 +223,10 @@ export default function Plan() {
               </li>
             ))}
           </ol>
+
+          {walk.agentRun?.id && (
+            <RefinePanel runId={walk.agentRun.id} onComposed={reloadWalk} />
+          )}
 
           <div className="plan-actions">
             <Button variant="ghost" onClick={() => navigate('/folio')}>← Back to folio</Button>

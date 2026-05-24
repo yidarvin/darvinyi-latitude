@@ -100,6 +100,47 @@ router.post('/agent-runs/:id/reply', requireAuth, async (req, res, next) => {
 });
 
 /**
+ * POST /api/agent-runs/:id/refine
+ * Re-open a composed run for refinement. Appends the user's note as a new
+ * user message and flips the run back to active. The client then re-opens the
+ * stream; on the next compose_walk the agent updates the existing walk in place.
+ */
+const refineSchema = z.object({
+  message: z.string().min(1).max(2000),
+});
+
+router.post('/agent-runs/:id/refine', requireAuth, async (req, res, next) => {
+  try {
+    const { message } = refineSchema.parse(req.body);
+    const { id } = req.params;
+
+    const run = await prisma.agentRun.findFirst({
+      where: { id, userId: req.user.id },
+    });
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+    if (run.status !== 'composed' || !run.walkId) {
+      return res.status(400).json({ error: 'This walk is not ready to refine' });
+    }
+
+    const messages = Array.isArray(run.messages) ? [...run.messages] : [];
+    messages.push({
+      role: 'user',
+      content: [{ type: 'text', text: message }],
+    });
+
+    await prisma.agentRun.update({
+      where: { id },
+      data:  { messages, status: 'active' },
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.name === 'ZodError') return res.status(400).json({ error: 'Invalid message' });
+    next(err);
+  }
+});
+
+/**
  * POST /api/agent-runs/:id/abort
  * Marks an active or awaiting_user run as abandoned. Client should then
  * navigate away. Composed runs cannot be aborted.

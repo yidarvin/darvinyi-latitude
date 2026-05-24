@@ -77,7 +77,7 @@ export const TOOL_DEFS = [
   },
   {
     name: 'compose_walk',
-    description: 'Finalize the walk plan. Call exactly once when you have everything. This creates the Walk + Stop rows in the database and ends the run.',
+    description: 'Finalize the walk plan. On the first pass, call once when you have everything — this creates the Walk + Stop rows. During refinement, call it again to save changes — it updates the existing walk in place.',
     input_schema: {
       type: 'object',
       properties: {
@@ -279,4 +279,57 @@ export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, c
   });
 
   return walk.id;
+}
+
+/**
+ * Update an existing walk in place from a re-issued compose_walk call.
+ * Used during refinement: the run already has a walkId, so instead of
+ * creating a new Walk we overwrite the composed fields and replace all stops.
+ * The brief-derived fields (location, camera, lens, mobility, styles, intent)
+ * come from the original brief snapshot and are intentionally left untouched.
+ *
+ * @param {string} walkId
+ * @param {object} briefSnapshot  unused for now, kept for signature symmetry
+ * @param {object} composed       the validated input of the compose_walk tool call
+ */
+export async function updateWalkFromCompose(walkId, briefSnapshot, composed) {
+  try {
+    polyline.decode(composed.walkingPolyline);
+  } catch {
+    throw new Error('walkingPolyline is not a valid encoded polyline');
+  }
+
+  await prisma.$transaction([
+    prisma.stop.deleteMany({ where: { walkId } }),
+    prisma.walk.update({
+      where: { id: walkId },
+      data: {
+        title:        composed.title,
+        subtitle:     composed.subtitle,
+        brief:        composed.brief,
+        centerLat:    composed.centerLat,
+        centerLng:    composed.centerLng,
+        timeOfDay:    composed.timeOfDay,
+        durationMin:  composed.durationMin,
+        distanceM:    composed.distanceM,
+        walkingPolyline: composed.walkingPolyline,
+        transitPolyline: composed.transitPolyline || null,
+        conditions:   composed.conditions,
+        composedAt:   new Date(),
+        stops: {
+          create: composed.stops.map(s => ({
+            ordinal:      s.ordinal,
+            name:         s.name,
+            lat:          s.lat,
+            lng:          s.lng,
+            arrivalTime:  s.arrival_time,
+            durationMin:  s.duration_minutes,
+            brief:        s.brief,
+          })),
+        },
+      },
+    }),
+  ]);
+
+  return walkId;
 }

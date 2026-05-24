@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../db.js';
 import { decryptApiKey } from '../lib/crypto.js';
-import { TOOL_DEFS, executeTool, createWalkFromCompose } from './tools.js';
+import { TOOL_DEFS, executeTool, createWalkFromCompose, updateWalkFromCompose } from './tools.js';
 import { SYSTEM_PROMPT } from './systemPrompt.js';
 
 const MODEL = 'claude-sonnet-4-6';
@@ -109,6 +109,17 @@ export async function runAgentLoop(sse, runId) {
       messages = [...messages, { role: 'assistant', content: finalMessage.content }];
 
       if (finalMessage.stop_reason === 'end_turn') {
+        if (run.walkId) {
+          // Refinement: the walk already exists and the agent answered
+          // conversationally without recomposing. That's allowed — just pause.
+          await prisma.agentRun.update({
+            where: { id: runId },
+            data: { status: 'composed', messages },
+          });
+          sse.send('turn_end', {});
+          sse.close(); cleanup();
+          return;
+        }
         await prisma.agentRun.update({
           where: { id: runId },
           data: { status: 'error', errorMessage: 'Agent ended without composing a walk', messages },
@@ -143,12 +154,19 @@ export async function runAgentLoop(sse, runId) {
       const compose = toolUses.find(t => t.name === 'compose_walk');
       if (compose) {
         try {
-          const walkId = await createWalkFromCompose(
-            run.user.id,
-            runId,
-            run.briefSnapshot,
-            compose.input,
-          );
+          // First composition creates the walk; a refinement (run.walkId already
+          // set) updates that same walk in place.
+          let walkId = run.walkId;
+          if (walkId) {
+            await updateWalkFromCompose(walkId, run.briefSnapshot, compose.input);
+          } else {
+            walkId = await createWalkFromCompose(
+              run.user.id,
+              runId,
+              run.briefSnapshot,
+              compose.input,
+            );
+          }
           messages = [...messages, {
             role: 'user',
             content: [{

@@ -864,6 +864,49 @@
   border-top: 1px solid var(--border);
 }
 
+/* ─── Refine panel (talk to the agent again) ─── */
+.refine {
+  margin-top: 32px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+.refine-title { margin-bottom: 16px; }
+.refine-transcript { margin-bottom: 18px; }
+.refine-hint {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.refine-hint em { font-style: italic; color: var(--text-soft); }
+.refine-status {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  padding: 6px 0;
+}
+.refine-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.refine-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.refine-chip:hover { color: var(--text-soft); border-color: var(--text-dim); }
+
 @media (max-width: 1100px) {
   .plan-wrap { grid-template-columns: 1fr; }
   .plan-map { height: 480px; }

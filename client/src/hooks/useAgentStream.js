@@ -12,20 +12,27 @@ import * as agentRunsApi from '../api/agentRuns.js';
  *   - error:         string or null
  *   - status:        'connecting' | 'streaming' | 'awaiting' | 'composed' | 'error' | 'idle'
  *   - submitReply:   async (text) => void
+ *   - refine:        async (text) => void   (re-open a composed run with a note)
+ *
+ * Options:
+ *   - autoStart (default true): open the stream on mount. Pass false for a run
+ *     that's already composed (e.g. the Plan screen), and drive it via refine().
  *
  * Connection lifecycle:
- *   - Mounts → opens EventSource
+ *   - Mounts → opens EventSource (unless autoStart is false)
  *   - On awaiting_user → closes, sets awaitingUser
  *   - submitReply → POSTs the reply, then re-opens EventSource
- *   - On composed → sets composed, closes, never re-opens
+ *   - On composed → sets composed, closes
+ *   - refine → POSTs the note, then re-opens EventSource (composed cleared)
+ *   - On turn_end → closes, status 'idle' (refinement reply with no recompose)
  */
-export function useAgentStream(runId) {
+export function useAgentStream(runId, { autoStart = true } = {}) {
   const [turns,        setTurns]        = useState([]);
   const [activeText,   setActiveText]   = useState('');
   const [awaitingUser, setAwaitingUser] = useState(null);
   const [composed,     setComposed]     = useState(null);
   const [error,        setError]        = useState(null);
-  const [status,       setStatus]       = useState('connecting');
+  const [status,       setStatus]       = useState(autoStart ? 'connecting' : 'idle');
 
   const sourceRef = useRef(null);
   const activeTextRef = useRef('');
@@ -98,6 +105,13 @@ export function useAgentStream(runId) {
       close();
     });
 
+    src.addEventListener('turn_end', () => {
+      // Refinement: agent replied without recomposing. Walk is unchanged.
+      flushActiveText();
+      setStatus('idle');
+      close();
+    });
+
     src.addEventListener('error', (e) => {
       if (e.data) {
         try {
@@ -117,7 +131,7 @@ export function useAgentStream(runId) {
   }, [runId, close]);
 
   useEffect(() => {
-    openStream();
+    if (autoStart) openStream();
     return () => close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
@@ -136,6 +150,21 @@ export function useAgentStream(runId) {
     }
   }, [runId, awaitingUser, openStream]);
 
+  const refine = useCallback(async (note) => {
+    setTurns(prev => [...prev, { kind: 'user', text: note }]);
+    setComposed(null);
+    setError(null);
+    setAwaitingUser(null);
+    setStatus('streaming');
+    try {
+      await agentRunsApi.refineRun(runId, note);
+      openStream();
+    } catch (err) {
+      setError(err.message || 'Failed to start refinement');
+      setStatus('error');
+    }
+  }, [runId, openStream]);
+
   return {
     turns,
     activeText,
@@ -144,5 +173,6 @@ export function useAgentStream(runId) {
     error,
     status,
     submitReply,
+    refine,
   };
 }

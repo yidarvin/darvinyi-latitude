@@ -71,6 +71,7 @@ router.get('/walks/:id', requireAuth, async (req, res, next) => {
       where: { id: req.params.id, userId: req.user.id },
       include: {
         stops: { orderBy: { ordinal: 'asc' } },
+        agentRun: { select: { id: true } },
       },
     });
 
