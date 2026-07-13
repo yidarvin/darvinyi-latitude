@@ -7,7 +7,10 @@
     "start": "prisma migrate deploy && node src/index.js",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/test-tools.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
@@ -18,11 +21,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

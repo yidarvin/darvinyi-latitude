@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as walksApi from '../api/walks.js';
+import { get } from '../api/client.js';
 import TopNav from '../components/TopNav.jsx';
 import StepIndicator from '../components/StepIndicator.jsx';
 import Button from '../components/Button.jsx';
@@ -30,9 +31,9 @@ const CAMERAS = [
   { id: 'canon-r5',    type: 'mirrorless', label: 'Canon EOS R5' },
   { id: 'nikon-z6iii', type: 'mirrorless', label: 'Nikon Z6 III' },
   { id: 'leica-sl3',   type: 'mirrorless', label: 'Leica SL3' },
-  { id: 'hassel-x2d2', type: 'medium',     label: 'Hasselblad X2D II 100C' },
-  { id: 'fuji-gfx100', type: 'medium',     label: 'Fujifilm GFX 100 II' },
-  { id: 'hassel-907x', type: 'medium',     label: 'Hasselblad 907X & CFV 100C' },
+  { id: 'hassel-x2d2', type: 'medium',     label: 'Hasselblad X2D II 100C',      lensSpec: '38mm f/2.5 V · 90mm f/2.5 V' },
+  { id: 'fuji-gfx100', type: 'medium',     label: 'Fujifilm GFX 100 II',         lensSpec: '63mm f/2.8 · 110mm f/2' },
+  { id: 'hassel-907x', type: 'medium',     label: 'Hasselblad 907X & CFV 100C',  lensSpec: '80mm f/2.4' },
   { id: 'leica-m6',    type: 'film',       label: 'Leica M6 (35mm)' },
   { id: 'mamiya-7ii',  type: 'film',       label: 'Mamiya 7 II (medium format)' },
   { id: 'hassel-500',  type: 'film',       label: 'Hasselblad 500C/M (medium format)' },
@@ -64,13 +65,6 @@ const TOD_OPTIONS = [
   { value: 'night',   label: '⏵ Night' },
 ];
 
-const MOBILITY_OPTIONS = [
-  { value: 'foot',    label: '⏚ On Foot' },
-  { value: 'transit', label: '⎌ Public Transit' },
-  { value: 'bike',    label: '⏃ Bicycle' },
-  { value: 'ride',    label: '⎈ Car / Rideshare' },
-];
-
 const ROUTE_SHAPE_OPTIONS = [
   { value: 'line', label: '→ One way — point to point' },
   { value: 'loop', label: '↻ Round trip — start & finish together' },
@@ -95,7 +89,7 @@ const INITIAL = {
   timeOfDay:    'morning',
   cameraId:     'fuji-x100vi',
   lensIds:      [],
-  mobility:     ['foot', 'transit'],
+  lensText:     '',
   routeShape:   'line',
   styles:       ['street', 'arch'],
   intent:       '',
@@ -133,11 +127,7 @@ export default function Brief() {
         });
       });
       const { latitude, longitude } = pos.coords;
-      const res = await fetch(`/api/util/reverse-geocode?lat=${latitude}&lng=${longitude}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Reverse geocode failed');
-      const { name } = await res.json();
+      const { name } = await get(`/util/reverse-geocode?lat=${latitude}&lng=${longitude}`);
       update('locationName', name);
     } catch (err) {
       if (err.code === 1) setError('Location permission denied.');
@@ -148,18 +138,23 @@ export default function Brief() {
     }
   };
 
-  const isValid =
-    form.locationName.trim().length >= 2 &&
-    form.mobility.length >= 1 &&
-    form.styles.length >= 1 &&
-    (camera.type !== 'mirrorless' || form.lensIds.length >= 1);
+  // Computed live (not just on submit attempt) — the submit button stays
+  // disabled while any of these are unmet, so this doubles as the only
+  // place that explains *why*, right next to the button.
+  const missingRequirements = useMemo(() => {
+    const missing = [];
+    if (form.locationName.trim().length < 2) missing.push('a location');
+    if (form.styles.length === 0) missing.push('at least one style');
+    if (camera.type === 'mirrorless' && form.lensIds.length === 0) missing.push('at least one lens for your mirrorless body');
+    if (camera.type === 'film' && form.lensText.trim().length === 0) missing.push('your lens & film stock');
+    return missing;
+  }, [form.locationName, form.styles, form.lensIds, form.lensText, camera.type]);
+
+  const isValid = missingRequirements.length === 0;
 
   const submit = async () => {
+    if (!isValid) return; // button is disabled in this state — defensive only
     setError(null);
-    if (!isValid) {
-      setError('Fill in location, pick at least one mobility option, style, and (for mirrorless) at least one lens.');
-      return;
-    }
     setSubmitting(true);
     try {
       const res = await walksApi.submitBriefDraft({
@@ -168,10 +163,15 @@ export default function Brief() {
         timeOfDay:    form.timeOfDay,
         cameraId:     form.cameraId,
         lensIds:      camera.type === 'mirrorless' ? form.lensIds : [],
-        mobility:     form.mobility,
+        lensText:     camera.type === 'film' ? form.lensText.trim() : '',
         styles:       form.styles,
         roundTrip:    form.routeShape === 'loop',
         intent:       form.intent.trim(),
+        // The user's own local calendar date — .toISOString() is always UTC,
+        // which tells an evening photographer it's already tomorrow. Sent so
+        // the agent's "today" (and default weather lookups) match the
+        // photographer's actual day, not the server's.
+        localDate:    new Date().toLocaleDateString('en-CA'),
       });
       navigate(`/dialogue/${res.agentRunId}`);
     } catch (err) {
@@ -186,10 +186,11 @@ export default function Brief() {
 
       <StepIndicator steps={WALK_STEPS} current="brief" />
 
+      <main>
       <div className="brief-head">
         <div>
           <div className="kicker">01 · The Brief</div>
-          <h2 className="display-sm">Compose today's <em>walk.</em></h2>
+          <h1 className="display-sm">Compose today's <em>walk.</em></h1>
         </div>
         <div className="brief-head-meta">
           Draft · <b>unsigned</b><br />
@@ -211,9 +212,14 @@ export default function Brief() {
               onChange={(e) => update('locationName', e.target.value)}
               disabled={submitting}
             />
-            <span className="field-aux" onClick={!locating ? useMyLocation : undefined}>
+            <button
+              type="button"
+              className="field-aux"
+              onClick={useMyLocation}
+              disabled={locating}
+            >
               {locating ? 'Locating…' : '⌖ Use mine'}
-            </span>
+            </button>
           </div>
         </div>
 
@@ -233,6 +239,7 @@ export default function Brief() {
             value={form.timeOfDay}
             onChange={(v) => update('timeOfDay', v)}
             mode="single"
+            label="Time of day"
           />
         </div>
 
@@ -262,21 +269,27 @@ export default function Brief() {
                 value={form.lensIds}
                 onChange={(v) => update('lensIds', v)}
                 mode="multi"
+                label="Lenses"
               />
             </>
           ) : camera.type === 'film' ? (
             <>
-              <label className="form-label">Lens &amp; film</label>
-              <div className="lens-fixed-display">50mm Summicron · Tri-X 400</div>
+              <label className="form-label">
+                Lens &amp; film <span className="form-label-aux">— what you're bringing</span>
+              </label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="e.g. 50mm Summicron · Tri-X 400"
+                value={form.lensText}
+                onChange={(e) => update('lensText', e.target.value)}
+                disabled={submitting}
+              />
             </>
           ) : camera.type === 'medium' ? (
             <>
               <label className="form-label">Lens</label>
-              <div className="lens-fixed-display">
-                {camera.id === 'hassel-x2d2' && '38mm f/2.5 V · 90mm f/2.5 V'}
-                {camera.id === 'fuji-gfx100' && '63mm f/2.8 · 110mm f/2'}
-                {camera.id === 'hassel-907x' && '80mm f/2.4'}
-              </div>
+              <div className="lens-fixed-display">{camera.lensSpec}</div>
             </>
           ) : (
             <>
@@ -290,18 +303,6 @@ export default function Brief() {
 
         <div className="field field-full">
           <label className="form-label">
-            Mobility <span className="form-label-aux">— multi-select</span>
-          </label>
-          <ChipGroup
-            options={MOBILITY_OPTIONS}
-            value={form.mobility}
-            onChange={(v) => update('mobility', v)}
-            mode="multi"
-          />
-        </div>
-
-        <div className="field field-full">
-          <label className="form-label">
             Route shape <span className="form-label-aux">— how the walk is laid out</span>
           </label>
           <ChipGroup
@@ -309,6 +310,7 @@ export default function Brief() {
             value={form.routeShape}
             onChange={(v) => update('routeShape', v)}
             mode="single"
+            label="Route shape"
           />
         </div>
 
@@ -321,6 +323,7 @@ export default function Brief() {
             value={form.styles}
             onChange={(v) => update('styles', v)}
             mode="multi"
+            label="Photography styles you're open to"
           />
         </div>
 
@@ -331,7 +334,7 @@ export default function Brief() {
           <textarea
             className="form-input"
             rows={2}
-            placeholder="A theme, a deadline, a mood…"
+            placeholder="A theme, a deadline, a mood, a note about taking transit between stops…"
             value={form.intent}
             onChange={(e) => update('intent', e.target.value)}
             disabled={submitting}
@@ -344,7 +347,9 @@ export default function Brief() {
         <div className="brief-note-label">⏵ Latitude</div>
         <div className="brief-note-text">
           I'll read this against your last walks before composing a route.
-          Expect 2&ndash;3 follow-up questions &mdash; <em>only the ones worth asking.</em>
+          Expect 2&ndash;3 follow-up questions &mdash; <em>only the ones worth asking.</em>{' '}
+          Every walk plans on foot &mdash; mention transit in Intent if you're open to it between stops.
+          Routes cost roughly $0.10&ndash;0.30 in Anthropic usage on your own key.
         </div>
       </div>
 
@@ -352,9 +357,16 @@ export default function Brief() {
         <div className="form-error" style={{ marginBottom: 24 }}>{error}</div>
       )}
 
+      {!isValid && !submitting && (
+        <div className="form-hint" style={{ marginBottom: 16 }}>
+          Still need: {missingRequirements.join(', ')}.
+        </div>
+      )}
+
       <Button onClick={submit} disabled={submitting || !isValid} arrow={!submitting}>
         {submitting ? 'Sending…' : 'Send to agent'}
       </Button>
+      </main>
     </div>
   );
 }

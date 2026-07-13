@@ -17,8 +17,8 @@
   /* Text */
   --text:         #e8e6e1;
   --text-soft:    #a0a0a0;
-  --text-faint:   #6a6a6a;
-  --text-dim:     #4a4a4a;
+  --text-faint:   #8a8a8a; /* functional labels/meta — meets 4.5:1 on dark surfaces */
+  --text-dim:     #4a4a4a; /* decorative only (placeholders, dividers) — never for meaningful text */
 
   /* Single accent — teal/cyan */
   --accent:       #2dd4bf;
@@ -26,6 +26,9 @@
   --accent-dim:   rgba(45, 212, 191, 0.14);
   --accent-faint: rgba(45, 212, 191, 0.06);
   --accent-line:  rgba(45, 212, 191, 0.35);
+
+  /* Functional */
+  --danger:       #f87171;
 
   /* Type */
   --serif: 'Crimson Pro', Georgia, serif;
@@ -63,6 +66,35 @@ body::before {
 ::selection { background: var(--accent-dim); color: var(--accent-bright); }
 
 a { color: inherit; text-decoration: none; }
+
+/* ───── Focus visibility ─────
+   Covers .btn/.chip/.nav-link/.refine-chip/.field-aux/.step/.shotlist-item-btn
+   and any Link/button generically — form-input/turn-input have their own
+   inline treatment since they already carry a visible focus border. */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ───── Reduced motion ───── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ───── Error utility ───── */
+.error-banner {
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 20px;
+}
 
 /* ───── Type utilities ───── */
 .serif { font-family: var(--serif); }

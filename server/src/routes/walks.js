@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
   CAMERAS, MIRRORLESS_LENSES, STYLE_OPTIONS, TOD_OPTIONS,
-  MOBILITY_OPTIONS, DURATIONS, findCamera, findDuration,
+  DURATIONS, findCamera, findDuration,
 } from '../lib/cameras.js';
 
 const router = Router();
@@ -20,22 +20,37 @@ const briefSchema = z.object({
   timeOfDay:    z.enum(TOD_OPTIONS),
   cameraId:     z.enum(cameraIds),
   lensIds:      z.array(z.string()).optional().default([]),
-  mobility:     z.array(z.enum(MOBILITY_OPTIONS)).min(1, 'Choose at least one mobility option'),
+  // Free-text lens + film stock for film bodies — the only camera type with
+  // no fixed lensSpec and no chip-selectable lens list.
+  lensText:     z.string().max(120).optional().default(''),
   styles:       z.array(z.enum(STYLE_OPTIONS)).min(1, 'Choose at least one style'),
   roundTrip:    z.boolean().optional().default(false),
   intent:       z.string().max(500).optional().default(''),
+  // The photographer's own local calendar date (YYYY-MM-DD), so the agent's
+  // "today" matches their timezone rather than the server's UTC clock.
+  // Optional + validated loosely since it's client-computed, not user input.
+  localDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+const WALKS_PAGE_SIZE = 24;
+
 /**
- * GET /api/walks
- * List the current user's walks, most recent first.
- * Returns lightweight cards (no per-stop detail — that comes from /walks/:id).
+ * GET /api/walks?cursor=<walkId>
+ * List the current user's walks, most recent first, paginated. Returns
+ * lightweight cards (no per-stop detail — that comes from /walks/:id) plus
+ * every stop's bare coordinates for the folio thumbnail minimaps.
  */
 router.get('/walks', requireAuth, async (req, res, next) => {
   try {
-    const walks = await prisma.walk.findMany({
+    const cursor = typeof req.query.cursor === 'string' && req.query.cursor.trim() ? req.query.cursor.trim() : undefined;
+
+    const rows = await prisma.walk.findMany({
       where: { userId: req.user.id, status: { not: 'draft' } },
-      orderBy: { date: 'desc' },
+      // date(desc) alone isn't a stable sort — walks composed in the same
+      // instant would tie. id is unique, so it makes cursor pagination exact.
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+      take: WALKS_PAGE_SIZE + 1, // one extra row, to know if there's a next page
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
         id: true,
         title: true,
@@ -47,6 +62,7 @@ router.get('/walks', requireAuth, async (req, res, next) => {
         distanceM: true,
         cameraBody: true,
         styles: true,
+        status: true,
         stops: {
           select: { ordinal: true, lat: true, lng: true },
           orderBy: { ordinal: 'asc' },
@@ -55,7 +71,10 @@ router.get('/walks', requireAuth, async (req, res, next) => {
       },
     });
 
-    res.json({ walks });
+    const hasMore = rows.length > WALKS_PAGE_SIZE;
+    const walks = hasMore ? rows.slice(0, WALKS_PAGE_SIZE) : rows;
+
+    res.json({ walks, nextCursor: hasMore ? walks[walks.length - 1].id : null });
   } catch (err) {
     next(err);
   }
@@ -110,6 +129,39 @@ router.delete('/walks/:id', requireAuth, async (req, res, next) => {
   }
 });
 
+const statusSchema = z.object({
+  status: z.enum(['composed', 'completed']),
+});
+
+/**
+ * PATCH /api/walks/:id/status
+ * Mark a walk as walked (or back to just composed). get_user_history reports
+ * this to the agent, so completed walks read as lived-in history rather than
+ * unexecuted plans.
+ */
+router.patch('/walks/:id/status', requireAuth, async (req, res, next) => {
+  try {
+    const { status } = statusSchema.parse(req.body);
+
+    const walk = await prisma.walk.findFirst({
+      where: { id: req.params.id, userId: req.user.id },
+      select: { id: true },
+    });
+    if (!walk) {
+      return res.status(404).json({ error: 'Walk not found' });
+    }
+
+    await prisma.walk.update({ where: { id: walk.id }, data: { status } });
+
+    res.json({ ok: true, status });
+  } catch (err) {
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    next(err);
+  }
+});
+
 /**
  * POST /api/walks/draft
  * Creates an AgentRun seeded with the validated brief.
@@ -132,6 +184,11 @@ router.post('/walks/draft',
       lensSpec = validLensIds
         .map(id => MIRRORLESS_LENSES.find(l => l.id === id).label)
         .join(' · ');
+    } else if (camera.type === 'film') {
+      lensSpec = brief.lensText.trim();
+      if (!lensSpec) {
+        return res.status(400).json({ error: 'Enter your lens and film stock for a film body' });
+      }
     }
 
     const duration = findDuration(brief.durationId);
@@ -146,10 +203,10 @@ router.post('/walks/draft',
       cameraLabel:  camera.label.split(' · ')[0],
       lensIds:      brief.lensIds || [],
       lensSpec,
-      mobility:     brief.mobility,
       styles:       brief.styles,
       roundTrip:    brief.roundTrip,
       intent:       brief.intent || null,
+      localDate:    brief.localDate || new Date().toISOString().slice(0, 10),
       submittedAt:  new Date().toISOString(),
     };
 

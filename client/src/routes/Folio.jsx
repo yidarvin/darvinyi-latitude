@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as walksApi from '../api/walks.js';
+import * as agentRunsApi from '../api/agentRuns.js';
 import { useAuth } from '../hooks/useAuth.jsx';
 import TopNav from '../components/TopNav.jsx';
 import Button from '../components/Button.jsx';
 import WalkThumb from '../components/WalkThumb.jsx';
-import LoadingDot from '../components/LoadingDot.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { SkeletonLine, SkeletonBlock } from '../components/Skeleton.jsx';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
 import { styleLabel, todLabel, formatDate, formatKm } from '../lib/walkLabels.js';
@@ -15,9 +16,13 @@ export default function Folio() {
   const navigate = useNavigate();
 
   const [walks, setWalks] = useState(null);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [insight, setInsight] = useState(null);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [resumableRuns, setResumableRuns] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,23 +34,46 @@ export default function Folio() {
         ]);
         if (cancelled) return;
         setWalks(walksRes.walks);
+        setNextCursor(walksRes.nextCursor || null);
         setInsight(insightRes);
       } catch (err) {
         if (cancelled) return;
         setError(err.message || 'Failed to load folio');
       }
     })();
+    // Best-effort — a failed lookup just means no resume banner, not a
+    // broken folio.
+    agentRunsApi.listAgentRuns()
+      .then((res) => { if (!cancelled) setResumableRuns(res.runs || []); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const handleDelete = async (e, walk) => {
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await walksApi.listWalks(nextCursor);
+      setWalks(prev => [...prev, ...res.walks]);
+      setNextCursor(res.nextCursor || null);
+    } catch (err) {
+      setError(err.message || 'Failed to load more walks');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const requestDelete = (e, walk) => {
     e.preventDefault();
     e.stopPropagation();
     if (deletingId) return;
-    const ok = window.confirm(
-      `Delete "${walk.title}"? Its photo stops become fair game for future walks. This can't be undone.`
-    );
-    if (!ok) return;
+    setConfirmTarget(walk);
+  };
+
+  const confirmDelete = async () => {
+    const walk = confirmTarget;
+    setConfirmTarget(null);
+    if (!walk) return;
 
     setDeletingId(walk.id);
     try {
@@ -67,9 +95,9 @@ export default function Folio() {
     return (
       <div className="app">
         <TopNav />
-        <div style={{ color: '#f87171', fontFamily: 'var(--mono)', fontSize: 12, padding: 20 }}>
+        <main className="error-banner" role="alert">
           {error}
-        </div>
+        </main>
       </div>
     );
   }
@@ -78,6 +106,7 @@ export default function Folio() {
     return (
       <div className="app">
         <TopNav />
+        <main>
         <div className="folio-head">
           <div>
             <SkeletonLine width={180} height={11} style={{ marginBottom: 14 }} />
@@ -98,6 +127,7 @@ export default function Folio() {
             </div>
           ))}
         </div>
+        </main>
       </div>
     );
   }
@@ -109,10 +139,11 @@ export default function Folio() {
     <div className="app">
       <TopNav />
 
+      <main>
       <div className="folio-head">
         <div>
           <div className="kicker">Your folio · {new Date().toLocaleDateString(undefined, { dateStyle: 'long' })}</div>
-          <h2 className="display-sm">{greeting}, <em>{firstName}.</em></h2>
+          <h1 className="display-sm">{greeting}, <em>{firstName}.</em></h1>
         </div>
         <div className="folio-stats">
           <div><span className="stat-num">{insight.stats.totalWalks}</span>Walks</div>
@@ -120,6 +151,20 @@ export default function Folio() {
           <div><span className="stat-num"><em>{insight.stats.totalDistanceKm}</em>km</span>Walked</div>
         </div>
       </div>
+
+      {resumableRuns.length > 0 && (
+        <div className="resume-banner" role="status">
+          <div>
+            <div className="resume-banner-label">⏵ Walk in progress</div>
+            <div className="resume-banner-text">
+              {resumableRuns[0].locationName
+                ? <>You've got a walk going in <em>{resumableRuns[0].locationName.split(',')[0]}</em> — pick up where you left off.</>
+                : <>You've got a walk in progress — pick up where you left off.</>}
+            </div>
+          </div>
+          <Button onClick={() => navigate(`/dialogue/${resumableRuns[0].id}`)} arrow>Resume</Button>
+        </div>
+      )}
 
       <div className="insight-card">
         <div>
@@ -150,20 +195,23 @@ export default function Folio() {
                 <div className="walk-thumb">
                   <WalkThumb stops={w.stops} />
                   <div className="walk-meta-overlay">{formatDate(w.date)}</div>
+                  {w.status === 'completed' && (
+                    <div className="walk-walked-badge" title="Marked as walked">✓ Walked</div>
+                  )}
                   <button
                     type="button"
                     className="walk-delete"
                     title="Delete walk"
                     aria-label={`Delete ${w.title}`}
                     disabled={deletingId === w.id}
-                    onClick={(e) => handleDelete(e, w)}
+                    onClick={(e) => requestDelete(e, w)}
                   >
                     {deletingId === w.id ? '···' : '✕'}
                   </button>
                 </div>
                 <div className="walk-body">
                   <div className="walk-title">{renderEmphasis(emphasizeTitle(w.title))}</div>
-                  <div className="walk-location">{w.locationName.split(',')[0]} · SF</div>
+                  <div className="walk-location">{walkLocationLabel(w.locationName)}</div>
 
                   <div className="walk-tags">
                     {w.styles.slice(0, 2).map((s) => (
@@ -180,10 +228,39 @@ export default function Folio() {
               </Link>
             ))}
           </div>
+
+          {nextCursor && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 28 }}>
+              <Button variant="ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading…' : 'Load more walks'}
+              </Button>
+            </div>
+          )}
         </>
       )}
+      </main>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Delete this walk?"
+        message={confirmTarget ? `Delete "${confirmTarget.title}"? Its photo stops become fair game for future walks. This can't be undone.` : ''}
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
+}
+
+/**
+ * "Neighborhood, City" → "Neighborhood · City". Falls back to just the
+ * neighborhood when there's no comma (e.g. a single-word location).
+ */
+function walkLocationLabel(locationName) {
+  const [area, ...rest] = (locationName || '').split(',');
+  const region = rest.length ? rest[rest.length - 1].trim() : null;
+  return region ? `${area.trim()} · ${region}` : area.trim();
 }
 
 function greetingFor(d) {

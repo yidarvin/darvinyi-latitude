@@ -5,12 +5,12 @@ import polyline from '@mapbox/polyline';
 import TopNav from '../components/TopNav.jsx';
 import StepIndicator from '../components/StepIndicator.jsx';
 import Button from '../components/Button.jsx';
-import LoadingDot from '../components/LoadingDot.jsx';
 import { SkeletonLine, SkeletonBlock } from '../components/Skeleton.jsx';
 import RefinePanel from '../components/RefinePanel.jsx';
 import * as walksApi from '../api/walks.js';
 import { makeStopIcon } from '../lib/mapMarkers.js';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
+import { downloadGpx, mapsLink } from '../lib/gpx.js';
 
 const WALK_STEPS = [
   { key: 'brief',    label: 'Brief' },
@@ -26,29 +26,43 @@ export default function Plan() {
   const navigate = useNavigate();
 
   const [walk, setWalk]       = useState(null);
-  const [error, setError]     = useState(null);
+  const [error, setError]     = useState(null); // { notFound: boolean, message: string }
   const [activeStop, setActiveStop] = useState(null);
+  const [markingWalked, setMarkingWalked] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await walksApi.getWalk(id);
-        if (!cancelled) setWalk(res.walk);
-      } catch (err) {
-        if (!cancelled) setError(err.status === 404 ? 'Walk not found' : (err.message || 'Failed to load walk'));
-      }
-    })();
-    return () => { cancelled = true; };
+  const loadWalk = useCallback(async (signal) => {
+    try {
+      const res = await walksApi.getWalk(id);
+      if (signal?.cancelled) return;
+      setWalk(res.walk);
+      setError(null);
+    } catch (err) {
+      if (signal?.cancelled) return;
+      setError({
+        notFound: err.status === 404,
+        message: err.status === 404 ? 'Walk not found' : (err.message || "Couldn't load this walk"),
+      });
+    }
   }, [id]);
 
-  // Re-fetch after the agent refines, so the map + shotlist reflect the update.
+  useEffect(() => {
+    const signal = { cancelled: false };
+    loadWalk(signal);
+    return () => { signal.cancelled = true; };
+  }, [loadWalk]);
+
+  // Re-fetch after the agent refines, so the map + shotlist reflect the
+  // update. Returns whether it succeeded, so callers (RefinePanel) can be
+  // honest about it instead of always claiming success.
   const reloadWalk = useCallback(async () => {
     try {
       const res = await walksApi.getWalk(id);
       setWalk(res.walk);
       setActiveStop(null);
-    } catch { /* keep showing the prior version */ }
+      return true;
+    } catch {
+      return false;
+    }
   }, [id]);
 
   const walkingPath = useMemo(() => {
@@ -56,22 +70,44 @@ export default function Plan() {
     try { return polyline.decode(walk.walkingPolyline); } catch { return null; }
   }, [walk?.walkingPolyline]);
 
-  const transitPath = useMemo(() => {
-    if (!walk?.transitPolyline) return null;
-    try { return polyline.decode(walk.transitPolyline); } catch { return null; }
-  }, [walk?.transitPolyline]);
+  const toggleWalked = async () => {
+    if (markingWalked) return;
+    const nextStatus = walk.status === 'completed' ? 'composed' : 'completed';
+    setMarkingWalked(true);
+    try {
+      await walksApi.setWalkStatus(walk.id, nextStatus);
+      setWalk(prev => ({ ...prev, status: nextStatus }));
+    } catch {
+      // best-effort — leave state as-is, the button just stays clickable to retry
+    } finally {
+      setMarkingWalked(false);
+    }
+  };
 
   if (error) {
     return (
       <div className="app">
         <TopNav />
-        <div style={{ padding: 32, textAlign: 'center' }}>
-          <h2 className="display-sm">Walk <em>not found.</em></h2>
-          <p className="lede" style={{ margin: '12px auto 24px' }}>
-            This walk may have been deleted, or doesn't belong to your account.
-          </p>
-          <Button variant="ghost" onClick={() => navigate('/folio')}>← Back to folio</Button>
-        </div>
+        <main style={{ padding: 32, textAlign: 'center' }} role="alert">
+          {error.notFound ? (
+            <>
+              <h1 className="display-sm">Walk <em>not found.</em></h1>
+              <p className="lede" style={{ margin: '12px auto 24px' }}>
+                This walk may have been deleted, or doesn't belong to your account.
+              </p>
+              <Button variant="ghost" onClick={() => navigate('/folio')}>← Back to folio</Button>
+            </>
+          ) : (
+            <>
+              <h1 className="display-sm">Couldn't load this <em>walk.</em></h1>
+              <p className="lede" style={{ margin: '12px auto 24px' }}>{error.message}</p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <Button onClick={loadWalk}>Retry</Button>
+                <Button variant="ghost" onClick={() => navigate('/folio')}>← Back to folio</Button>
+              </div>
+            </>
+          )}
+        </main>
       </div>
     );
   }
@@ -80,6 +116,7 @@ export default function Plan() {
     return (
       <div className="app">
         <TopNav />
+        <main>
         <div className="plan-head">
           <div>
             <SkeletonLine width={140} height={11} style={{ marginBottom: 14 }} />
@@ -99,6 +136,7 @@ export default function Plan() {
             ))}
           </div>
         </div>
+        </main>
       </div>
     );
   }
@@ -115,13 +153,19 @@ export default function Plan() {
         onJump={(k) => k === 'brief' && navigate('/brief')}
       />
 
+      <main>
       <div className="plan-head">
         <div>
           <div className="kicker">03 · The Plan</div>
           <h1 className="display-sm">{renderEmphasis(emphasizeFirstNoun(walk.title))}</h1>
         </div>
-        <div className="plan-stamp">
-          {isJustComposed ? 'Just composed' : composedDateLabel}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {walk.status === 'completed' && (
+            <div className="plan-stamp is-walked">Walked</div>
+          )}
+          <div className="plan-stamp">
+            {isJustComposed ? 'Just composed' : composedDateLabel}
+          </div>
         </div>
       </div>
 
@@ -144,12 +188,6 @@ export default function Plan() {
                 pathOptions={{ color: '#2dd4bf', weight: 3, opacity: 0.95 }}
               />
             )}
-            {transitPath && (
-              <Polyline
-                positions={transitPath}
-                pathOptions={{ color: '#2dd4bf', weight: 2, opacity: 0.55, dashArray: '6 8' }}
-              />
-            )}
 
             {walk.stops.map((s) => (
               <Marker
@@ -160,6 +198,7 @@ export default function Plan() {
               />
             ))}
 
+            <FitBoundsController stops={walk.stops} walkingPath={walkingPath} />
             <PanController activeStop={activeStop} stops={walk.stops} />
           </MapContainer>
         </div>
@@ -209,17 +248,31 @@ export default function Plan() {
               <li
                 key={s.id}
                 className={`shotlist-item ${activeStop === s.id ? 'is-active' : ''}`}
-                onClick={() => setActiveStop(s.id)}
               >
-                <div className="shotlist-num">{String(s.ordinal).padStart(2, '0')}</div>
-                <div className="shotlist-body">
-                  <div className="shotlist-name">{s.name}</div>
-                  <div className="shotlist-brief">{renderEmphasis(s.brief)}</div>
-                </div>
-                <div className="shotlist-meta">
-                  <b>{s.arrivalTime}</b><br />
-                  {s.durationMin} min
-                </div>
+                <button
+                  type="button"
+                  className="shotlist-item-btn"
+                  onClick={() => setActiveStop(s.id)}
+                  aria-current={activeStop === s.id ? 'true' : undefined}
+                >
+                  <div className="shotlist-num">{String(s.ordinal).padStart(2, '0')}</div>
+                  <div className="shotlist-body">
+                    <div className="shotlist-name">{s.name}</div>
+                    <div className="shotlist-brief">{renderEmphasis(s.brief)}</div>
+                  </div>
+                  <div className="shotlist-meta">
+                    <b>{s.arrivalTime}</b><br />
+                    {s.durationMin} min
+                  </div>
+                </button>
+                <a
+                  className="shotlist-maps-link"
+                  href={mapsLink(s)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open in Maps ↗
+                </a>
               </li>
             ))}
           </ol>
@@ -233,8 +286,17 @@ export default function Plan() {
             <Button onClick={() => navigate('/brief')} arrow>Plan another</Button>
           </div>
 
+          <div className="plan-actions plan-actions-secondary">
+            <Button variant="ghost" onClick={toggleWalked} disabled={markingWalked}>
+              {walk.status === 'completed' ? 'Mark as not walked' : 'Mark as walked'}
+            </Button>
+            <Button variant="ghost" onClick={() => downloadGpx(walk, walkingPath)}>Download GPX</Button>
+            <Button variant="ghost" onClick={() => window.print()}>Print the plan</Button>
+          </div>
+
         </div>
       </div>
+      </main>
     </div>
   );
 }
@@ -247,8 +309,35 @@ function PanController({ activeStop, stops }) {
   useEffect(() => {
     if (!activeStop) return;
     const s = stops.find(x => x.id === activeStop);
-    if (s) map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 15), { duration: 0.6 });
+    if (!s) return;
+    const targetZoom = Math.max(map.getZoom(), 15);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      map.setView([s.lat, s.lng], targetZoom);
+    } else {
+      map.flyTo([s.lat, s.lng], targetZoom, { duration: 0.6 });
+    }
   }, [activeStop, stops, map]);
+  return null;
+}
+
+// ──────────────────────────────────────────────────
+// Re-fits the viewport whenever the route's geometry changes — react-leaflet
+// treats MapContainer's center/zoom as mount-only, so without this a refine
+// that relocates the walk leaves the map staring at the old center.
+// ──────────────────────────────────────────────────
+function FitBoundsController({ stops, walkingPath }) {
+  const map = useMap();
+  useEffect(() => {
+    const points = walkingPath && walkingPath.length > 0
+      ? walkingPath
+      : stops.map(s => [s.lat, s.lng]);
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], 15);
+    } else {
+      map.fitBounds(points, { padding: [40, 40], maxZoom: 16 });
+    }
+  }, [stops, walkingPath, map]);
   return null;
 }
 

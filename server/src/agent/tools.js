@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { prisma } from '../db.js';
 import { geocode, walkingDirections } from '../lib/mapbox.js';
 import { getWeather } from '../lib/openmeteo.js';
@@ -16,11 +17,20 @@ export const TOOL_DEFS = [
   },
   {
     name: 'geocode_location',
-    description: 'Convert a free-text place name into a coordinate. Use for any location the user mentions in their brief, or for any candidate stop you find via web_search.',
+    description: 'Convert a free-text place name or landmark into coordinates — including POIs like "Sutro Baths" or "Palace of Fine Arts", not just street addresses and neighborhoods. Use for any location in the brief, or any candidate stop you find via web_search. Returns up to 3 ranked candidates in `results` — pick the one that actually matches the intended place, don\'t assume the first is always correct. Pass `near` once you have a general area for the walk, so an ambiguous name (e.g. "Chinatown") resolves to the right neighborhood instead of a different city.',
     input_schema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Free-text location (e.g., "Balmy Alley, San Francisco")' },
+        query: { type: 'string', description: 'Free-text location (e.g., "Balmy Alley, San Francisco" or "Sutro Baths")' },
+        near: {
+          type: 'object',
+          description: 'Optional. A coordinate already established for this walk (the brief location, or an earlier stop), used to bias ambiguous results toward the right area.',
+          properties: {
+            lat: { type: 'number' },
+            lng: { type: 'number' },
+          },
+          required: ['lat', 'lng'],
+        },
       },
       required: ['query'],
     },
@@ -61,8 +71,9 @@ export const TOOL_DEFS = [
     },
   },
   {
-    type: 'web_search_20250305',
+    type: 'web_search_20260209',
     name: 'web_search',
+    max_uses: 5,
   },
   {
     name: 'request_user_input',
@@ -90,10 +101,9 @@ export const TOOL_DEFS = [
         durationMin:      { type: 'integer' },
         distanceM:        { type: 'integer' },
         walkingPolyline:  { type: 'string', description: 'Optional. Leave blank — the server draws the walking route from your stop coordinates. Only provide as a fallback.' },
-        transitPolyline:  { type: 'string' },
         stops: {
           type: 'array',
-          minItems: 4,
+          minItems: 3,
           maxItems: 12,
           items: {
             type: 'object',
@@ -148,7 +158,7 @@ export async function executeTool(toolName, input, ctx) {
       return await handleGeocode(input);
 
     case 'get_weather':
-      return await handleWeather(input);
+      return await handleWeather(input, ctx);
 
     case 'compute_route':
       return await handleComputeRoute(input);
@@ -173,6 +183,7 @@ async function handleGetUserHistory(userId) {
       durationMin:  true,
       distanceM:    true,
       cameraBody:   true,
+      status:       true,
       stops: {
         select: { ordinal: true, name: true, lat: true, lng: true },
         orderBy: { ordinal: 'asc' },
@@ -191,6 +202,10 @@ async function handleGetUserHistory(userId) {
       duration_min:  w.durationMin,
       distance_m:    w.distanceM,
       camera:        w.cameraBody,
+      // Whether the photographer actually walked this one, vs. a plan that
+      // was composed but never executed — don't let an unwalked plan read
+      // as lived history the way a completed walk does.
+      walked:        w.status === 'completed',
       stops:         w.stops.map(s => ({
         ordinal: s.ordinal, name: s.name, lat: s.lat, lng: s.lng
       })),
@@ -200,22 +215,139 @@ async function handleGetUserHistory(userId) {
 
 async function handleGeocode(input) {
   if (!input?.query) throw new Error('geocode_location requires query');
-  return await geocode(input.query);
+  return await geocode(input.query, input.near ? { proximity: input.near } : {});
 }
 
-async function handleWeather(input) {
+async function handleWeather(input, ctx) {
   if (typeof input?.lat !== 'number' || typeof input?.lng !== 'number') {
     throw new Error('get_weather requires lat + lng');
   }
-  return await getWeather(input.lat, input.lng, input.date);
+  // The model may omit `date` and expect "today" — resolve that from the
+  // brief's own local date (the photographer's timezone), not the server's.
+  const date = input.date || ctx?.briefSnapshot?.localDate || new Date().toISOString().slice(0, 10);
+  return await getWeather(input.lat, input.lng, date, ctx?.briefSnapshot?.timeOfDay);
 }
 
+const computeRouteStopsSchema = z.array(
+  z.object({
+    lat: z.number().gte(-90).lte(90),
+    lng: z.number().gte(-180).lte(180),
+  })
+).min(2).max(25);
+
 async function handleComputeRoute(input) {
-  if (!Array.isArray(input?.stops) || input.stops.length < 2) {
-    throw new Error('compute_route requires at least 2 stops');
+  // Model tool input is advisory, not enforced by the API — validate real
+  // finite, in-range coordinates before they reach a Mapbox URL path.
+  const result = computeRouteStopsSchema.safeParse(input?.stops);
+  if (!result.success) {
+    throw new Error(`compute_route input invalid — ${result.error.issues.map(i => `stops.${i.path.join('.')}: ${i.message}`).join('; ')}`);
   }
-  const route = await walkingDirections(input.stops);
+  const route = await walkingDirections(result.data);
   return route;
+}
+
+const MAX_STOP_RADIUS_KM = 20; // implausibly far for a single walk — likely a lat/lng swap or bad geocode
+
+const composeStopSchema = z.object({
+  ordinal:          z.number().int().positive(),
+  name:             z.string().min(1).max(200),
+  lat:              z.number().gte(-90).lte(90),
+  lng:              z.number().gte(-180).lte(180),
+  arrival_time:     z.string().min(1).max(20),
+  duration_minutes: z.number().int().positive(),
+  brief:            z.string().min(10).max(2000),
+});
+
+const composeWalkInputSchema = z.object({
+  title:           z.string().min(1).max(60),
+  subtitle:        z.string().min(1).max(120),
+  brief:           z.string().min(20).max(4000),
+  centerLat:       z.number().gte(-90).lte(90),
+  centerLng:       z.number().gte(-180).lte(180),
+  timeOfDay:       z.enum(['dawn', 'morning', 'midday', 'golden', 'blue', 'night']),
+  durationMin:     z.number().int().positive(),
+  distanceM:       z.number().int().nonnegative(),
+  walkingPolyline: z.string().optional(),
+  stops:           z.array(composeStopSchema).min(3).max(12),
+  conditions: z.object({
+    light:        z.string().min(1).max(2000),
+    weather:      z.string().min(1).max(2000),
+    camera_notes: z.string().min(1).max(2000),
+    afterward:    z.string().min(1).max(2000),
+  }),
+}).superRefine((data, ctx) => {
+  const sortedOrdinals = [...data.stops.map(s => s.ordinal)].sort((a, b) => a - b);
+  const expected = data.stops.map((_, i) => i + 1);
+  if (sortedOrdinals.some((o, i) => o !== expected[i])) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['stops'],
+      message: `Stop ordinals must be unique and numbered 1..${data.stops.length} — got [${sortedOrdinals.join(',')}]`,
+    });
+  }
+
+  for (const stop of data.stops) {
+    const distanceKm = haversineKm(data.centerLat, data.centerLng, stop.lat, stop.lng);
+    if (distanceKm > MAX_STOP_RADIUS_KM) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['stops', stop.ordinal],
+        message: `Stop "${stop.name}" (ordinal ${stop.ordinal}) is ${distanceKm.toFixed(1)}km from the walk center (${MAX_STOP_RADIUS_KM}km max) — check for a lat/lng swap or bad geocode result.`,
+      });
+    }
+  }
+});
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Validate the model's compose_walk tool input before it ever reaches
+ * Prisma. The JSON schema sent to Anthropic (TOOL_DEFS) is advisory — the
+ * API does not enforce minLength/minItems/enum membership — so without this,
+ * a swapped lat/lng or a hallucinated coordinate surfaces as an opaque Prisma
+ * error instead of a message the model can act on.
+ *
+ * @param {object} input  raw compose_walk tool_use input
+ * @returns {object} the validated, parsed input
+ * @throws {Error} with a message describing every violation, suitable for
+ *   feeding back to the model as an is_error tool_result
+ */
+export function validateComposeInput(input) {
+  const result = composeWalkInputSchema.safeParse(input);
+  if (!result.success) {
+    const detail = result.error.issues
+      .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    throw new Error(`compose_walk input invalid — ${detail}`);
+  }
+  return result.data;
+}
+
+/**
+ * @mapbox/polyline's decode() rarely throws on garbage input — it just
+ * produces wildly out-of-range coordinates. A structural try/catch around it
+ * is not a meaningful validity check, so we also bounds-check the decoded
+ * points before trusting a model-supplied fallback polyline.
+ */
+function isPlausiblePolyline(encoded) {
+  let points;
+  try {
+    points = polyline.decode(encoded);
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(points) || points.length === 0) return false;
+  return points.every(([lat, lng]) =>
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  );
 }
 
 /**
@@ -234,7 +366,7 @@ async function handleComputeRoute(input) {
  * @param {object} briefSnapshot  original brief (has .roundTrip)
  * @returns {Promise<{ polyline: string, distanceM: number }>}
  */
-async function resolveWalkingRoute(composed, briefSnapshot) {
+export async function resolveWalkingRoute(composed, briefSnapshot) {
   const ordered = [...composed.stops]
     .sort((a, b) => a.ordinal - b.ordinal)
     .map(s => ({ lat: s.lat, lng: s.lng }));
@@ -260,9 +392,7 @@ async function resolveWalkingRoute(composed, briefSnapshot) {
     if (!composed.walkingPolyline) {
       throw new Error('Could not compute a walking route for the stops');
     }
-    try {
-      polyline.decode(composed.walkingPolyline);
-    } catch {
+    if (!isPlausiblePolyline(composed.walkingPolyline)) {
       throw new Error('Could not compute a walking route and the fallback polyline was invalid');
     }
     return {
@@ -273,16 +403,17 @@ async function resolveWalkingRoute(composed, briefSnapshot) {
 }
 
 /**
- * Persist a composed walk to the database.
+ * Persist a composed walk to the database. Does NOT touch the AgentRun row —
+ * the caller (the agent loop) owns that update, since it also needs to
+ * persist the transcript alongside walkId/status in the same write.
  * Called by the agent loop, NOT routed through executeTool.
  *
  * @param {string} userId
- * @param {string} agentRunId
  * @param {object} briefSnapshot  the original brief from the AgentRun
  * @param {object} composed       the validated input of the compose_walk tool call
  * @returns {Promise<string>} walkId
  */
-export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, composed) {
+export async function createWalkFromCompose(userId, briefSnapshot, composed) {
   const { polyline: walkingPolyline, distanceM } = await resolveWalkingRoute(composed, briefSnapshot);
 
   const walk = await prisma.walk.create({
@@ -300,11 +431,10 @@ export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, c
       distanceM,
       cameraBody:   briefSnapshot.cameraLabel,
       lensSpec:     briefSnapshot.lensSpec,
-      mobility:     briefSnapshot.mobility,
+      mobility:     ['foot'], // Latitude only ever routes on foot
       styles:       briefSnapshot.styles,
       intent:       briefSnapshot.intent || null,
       walkingPolyline,
-      transitPolyline: composed.transitPolyline || null,
       conditions:   composed.conditions,
       status:       'composed',
       composedAt:   new Date(),
@@ -321,11 +451,6 @@ export async function createWalkFromCompose(userId, agentRunId, briefSnapshot, c
       },
     },
     select: { id: true },
-  });
-
-  await prisma.agentRun.update({
-    where: { id: agentRunId },
-    data:  { walkId: walk.id, status: 'composed' },
   });
 
   return walk.id;
@@ -359,7 +484,6 @@ export async function updateWalkFromCompose(walkId, briefSnapshot, composed) {
         durationMin:  composed.durationMin,
         distanceM,
         walkingPolyline,
-        transitPolyline: composed.transitPolyline || null,
         conditions:   composed.conditions,
         composedAt:   new Date(),
         stops: {

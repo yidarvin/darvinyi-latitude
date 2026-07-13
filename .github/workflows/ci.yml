@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: latitude
+          POSTGRES_PASSWORD: latitude
+          POSTGRES_DB: latitude_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U latitude"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://latitude:latitude@localhost:5432/latitude_ci
+      JWT_SECRET: ci-test-jwt-secret-at-least-32-characters-long
+      API_KEY_ENCRYPTION_KEY: EQeCEQhF6VvANq3JcQwfIizGf4NLGvbGqTeAcJmqUgc=
+      MAPBOX_TOKEN: pk.ci-placeholder-token-not-used-in-tests
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+        working-directory: server
+
+      - name: Apply migrations to CI database
+        run: npx prisma migrate deploy
+        working-directory: server
+
+      - name: Run server test suite
+        run: npm --prefix server test
+
+      - name: Build client
+        run: npm --prefix client run build

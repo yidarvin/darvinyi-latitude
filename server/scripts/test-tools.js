@@ -7,7 +7,11 @@ const TEST_USER_ID = process.env.TEST_USER_ID;
 
 console.log('─'.repeat(60));
 console.log('Testing Latitude agent tools');
+console.log('This is a manual, live-API smoke check (real Mapbox/Open-Meteo');
+console.log('calls) — distinct from the mocked unit suite (`npm test`).');
 console.log('─'.repeat(60));
+
+let failures = 0;
 
 async function run(label, fn) {
   process.stdout.write(`  ${label}... `);
@@ -20,6 +24,7 @@ async function run(label, fn) {
   } catch (err) {
     console.log('✗');
     console.error('    !', err.message);
+    failures++;
     return null;
   }
 }
@@ -64,7 +69,11 @@ async function main() {
   }
 
   console.log('\n' + '─'.repeat(60));
-  console.log('Done.');
+  if (failures > 0) {
+    console.log(`Done — ${failures} check(s) failed.`);
+    process.exit(1);
+  }
+  console.log('Done — all checks passed.');
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

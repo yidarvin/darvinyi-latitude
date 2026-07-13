@@ -162,6 +162,31 @@
 }
 .folio-stats .stat-num em { font-style: italic; color: var(--accent); }
 
+.resume-banner {
+  background: var(--accent-faint);
+  border: 1px solid var(--accent-line);
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+.resume-banner-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.resume-banner-text {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--text);
+}
+.resume-banner-text em { font-style: italic; color: var(--accent); }
+
 .insight-card {
   background: linear-gradient(180deg, var(--surface), var(--bg-elev));
   border: 1px solid var(--border);
@@ -264,11 +289,23 @@
 .walk-card:hover .walk-delete,
 .walk-delete:focus-visible { opacity: 1; }
 .walk-delete:hover {
-  color: #f87171;
-  border-color: #f87171;
+  color: var(--danger);
+  border-color: var(--danger);
   background: rgba(13,13,13,0.85);
 }
 .walk-delete:disabled { cursor: default; opacity: 1; color: var(--text-faint); }
+.walk-walked-badge {
+  position: absolute;
+  bottom: 10px; left: 10px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(13,13,13,0.7);
+  padding: 4px 8px;
+  border: 1px solid var(--accent-line);
+}
 /* Touch devices can't hover — keep the control reachable. */
 @media (hover: none) {
   .walk-delete { opacity: 1; }
@@ -329,6 +366,7 @@
   .folio-head { grid-template-columns: 1fr; }
   .folio-stats { gap: 24px; text-align: left; }
   .insight-card { grid-template-columns: 1fr; }
+  .resume-banner { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -389,10 +427,13 @@
   cursor: pointer;
   white-space: nowrap;
   padding: 0 12px;
+  background: transparent;
+  border: none;
   border-left: 1px solid var(--border);
   transition: background 0.2s;
 }
 .field-aux:hover { background: var(--accent-faint); }
+.field-aux:disabled { cursor: default; opacity: 0.7; }
 
 .lens-fixed-display {
   padding: 10px 0 8px;
@@ -529,6 +570,8 @@
 .turn-who.agent { color: var(--accent); }
 .turn-who.user  { color: var(--text-faint); }
 .turn-who.tool  { color: var(--text-faint); }
+.turn-who.error { color: var(--danger); }
+.turn-msg.error { color: var(--danger); }
 .turn-who::before {
   content: "";
   display: inline-block;
@@ -575,7 +618,7 @@
   color: var(--accent);
 }
 .turn-tool .tool-status.is-done { color: var(--text-faint); }
-.turn-tool .tool-status.is-error { color: #f87171; }
+.turn-tool .tool-status.is-error { color: var(--danger); }
 
 /* Streaming cursor */
 .cursor {
@@ -606,8 +649,10 @@
   font-family: var(--serif);
   font-size: 17px;
   color: var(--text);
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
 }
+.turn-input input:focus-visible { outline-color: var(--accent); }
 .turn-input input::placeholder { color: var(--text-dim); font-style: italic; }
 .turn-input button {
   background: var(--accent);
@@ -671,6 +716,15 @@
   background: var(--accent);
   border-radius: 50%;
   box-shadow: 0 0 8px var(--accent);
+}
+.plan-stamp.is-walked {
+  border-color: var(--text-faint);
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
+.plan-stamp.is-walked::before {
+  background: var(--text-faint);
+  box-shadow: none;
 }
 
 .plan-wrap {
@@ -812,17 +866,35 @@
   list-style: none;
 }
 .shotlist-item {
+  border-bottom: 1px solid var(--border-soft);
+}
+.shotlist-item:last-child { border-bottom: none; }
+.shotlist-item-btn {
   display: grid;
   grid-template-columns: 36px 1fr auto;
   gap: 14px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--border-soft);
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   transition: background 0.18s;
 }
-.shotlist-item:hover { background: var(--surface); }
-.shotlist-item.is-active { background: var(--surface); }
-.shotlist-item:last-child { border-bottom: none; }
+.shotlist-item-btn:hover,
+.shotlist-item.is-active .shotlist-item-btn { background: var(--surface); }
+.shotlist-maps-link {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 0 0 10px;
+}
+.shotlist-maps-link:hover { color: var(--accent); }
 .shotlist-num {
   font-family: var(--mono);
   font-size: 11px;
@@ -862,6 +934,12 @@
   gap: 12px;
   padding-top: 22px;
   border-top: 1px solid var(--border);
+}
+.plan-actions-secondary {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: none;
+  flex-wrap: wrap;
 }
 
 /* ─── Refine panel (talk to the agent again) ─── */
@@ -913,7 +991,7 @@
 }
 @media (max-width: 900px) {
   .conditions-row { grid-template-columns: 1fr; gap: 4px; }
-  .shotlist-item { grid-template-columns: 36px 1fr; }
+  .shotlist-item-btn { grid-template-columns: 36px 1fr; }
   .shotlist-meta { grid-column: 2; text-align: left; margin-top: 6px; }
 }
 
@@ -936,4 +1014,17 @@
   display: flex;
   gap: 12px;
   margin-top: 16px;
+}
+
+/* ════════════════════ Print (the Plan) ════════════════════ */
+@media print {
+  .topnav, .steps, .refine, .plan-actions, .plan-stamp,
+  .walk-delete, .dialogue-actions, .shotlist-maps-link { display: none !important; }
+  body, .app { background: #fff !important; color: #111 !important; }
+  .app { max-width: 100%; padding: 12px; }
+  .plan-wrap { grid-template-columns: 1fr; gap: 20px; }
+  .plan-map { height: 320px; border-color: #ccc; page-break-inside: avoid; }
+  .project-brief, .conditions-text, .shotlist-brief { color: #333 !important; }
+  .shotlist-item { page-break-inside: avoid; border-bottom-color: #ddd; }
+  .conditions { border-color: #ccc; background: #fafafa; }
 }
