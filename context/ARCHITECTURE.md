@@ -85,8 +85,7 @@ At signup, the key gets one cheap live check (`models.list()`, no tokens spent) 
 | POST   | /api/agent-runs/:id/abort  | Stop an in-progress run (marks `abandoned`) |
 | GET    | /api/folio/insight | The folio header insight (agent-generated if available, template fallback otherwise) + stats |
 | GET    | /api/util/reverse-geocode | "Use my location" support for the Brief form |
-| GET    | /api/health      | Health check (Railway healthcheck target) |
-| GET    | /api/db-health   | Database round-trip check |
+| GET    | /api/health      | Health check (Railway healthcheck target) — includes a DB round-trip (`SELECT 1`), so this alone also verifies DB connectivity |
 
 All non-GET routes above (except signup/login, which are unauthenticated by design) require `requireAuth` and scope every query to `req.user.id` — there is no route that trusts a client-supplied user id.
 
