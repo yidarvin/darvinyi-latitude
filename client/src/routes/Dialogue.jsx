@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import TopNav from '../components/TopNav.jsx';
 import StepIndicator from '../components/StepIndicator.jsx';
 import LoadingDot from '../components/LoadingDot.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import * as walksApi from '../api/walks.js';
 import * as agentRunsApi from '../api/agentRuns.js';
 import { abortRun } from '../api/agentRuns.js';
@@ -19,6 +20,11 @@ const WALK_STEPS = [
   { key: 'plan',     label: 'The Plan' },
 ];
 
+// Statuses where the stream endpoint has something useful to resume —
+// active/awaiting_user genuinely continue the dialogue, and 'error' just
+// replays the stored failure so the existing error UI renders it correctly.
+const RESUMABLE_STATUSES = new Set(['active', 'awaiting_user', 'error']);
+
 export default function Dialogue() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,10 +33,15 @@ export default function Dialogue() {
   const [pastWalks, setPastWalks]   = useState(null);
   const [loadError, setLoadError]   = useState(null);
   const [aborting, setAborting]     = useState(false);
+  const [confirmingAbort, setConfirmingAbort] = useState(false);
 
-  const handleAbort = async () => {
+  const handleAbort = () => {
     if (aborting) return;
-    if (!confirm('Stop this walk and discard the draft?')) return;
+    setConfirmingAbort(true);
+  };
+
+  const confirmAbort = async () => {
+    setConfirmingAbort(false);
     setAborting(true);
     try {
       await abortRun(id);
@@ -50,7 +61,7 @@ export default function Dialogue() {
         timeOfDay:    b.timeOfDay,
         cameraId:     b.cameraId,
         lensIds:      b.lensIds || [],
-        mobility:     b.mobility,
+        lensText:     b.cameraType === 'film' ? (b.lensSpec || '') : '',
         styles:       b.styles,
         roundTrip:    b.roundTrip || false,
         intent:       b.intent || '',
@@ -80,7 +91,26 @@ export default function Dialogue() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const stream = useAgentStream(id);
+  // Don't auto-open the stream — wait until the run's actual status is
+  // known. Otherwise a failed/slow getAgentRun() leaves the agent looping
+  // invisibly behind the load-error screen, and revisiting an aborted run's
+  // URL would silently resurrect it.
+  const stream = useAgentStream(id, { autoStart: false });
+
+  useEffect(() => {
+    if (!run) return;
+    if (run.status === 'composed') {
+      navigate(`/folio/walks/${run.walkId}`, { replace: true });
+      return;
+    }
+    if (RESUMABLE_STATUSES.has(run.status)) {
+      stream.start(run.transcript);
+    }
+    // Only re-run when the run identity actually changes — stream.start is
+    // stable per runId and re-triggering on every stream-state update would
+    // restart the connection in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id, run?.status]);
 
   useEffect(() => {
     if (stream.composed) {
@@ -95,9 +125,9 @@ export default function Dialogue() {
     return (
       <div className="app">
         <TopNav />
-        <div style={{ color: '#f87171', fontFamily: 'var(--mono)', padding: 24 }}>
+        <main className="error-banner" role="alert">
           {loadError}
-        </div>
+        </main>
       </div>
     );
   }
@@ -106,7 +136,25 @@ export default function Dialogue() {
     return (
       <div className="app">
         <TopNav />
-        <LoadingDot />
+        <main><LoadingDot /></main>
+      </div>
+    );
+  }
+
+  if (run.status === 'abandoned') {
+    return (
+      <div className="app">
+        <TopNav />
+        <main style={{ padding: 32, textAlign: 'center' }}>
+          <h1 className="display-sm">This walk was <em>stopped.</em></h1>
+          <p className="lede" style={{ margin: '12px auto 24px' }}>
+            The draft was discarded. Start a fresh one whenever you're ready.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button onClick={handleRestart}>Start over</Button>
+            <Button variant="ghost" onClick={() => navigate('/folio')}>Back to folio</Button>
+          </div>
+        </main>
       </div>
     );
   }
@@ -116,21 +164,22 @@ export default function Dialogue() {
       <TopNav />
       <StepIndicator steps={WALK_STEPS} current="dialogue" onJump={(k) => k === 'brief' && navigate('/brief')} />
 
-      <div className="dialogue-wrap">
+      <main className="dialogue-wrap">
 
         <aside className="dialogue-side">
           <div className="kicker">02 · Dialogue</div>
-          <h2 className="display-sm">A short <em>conversation.</em></h2>
+          <h1 className="display-sm">A short <em>conversation.</em></h1>
           <p className="body-md">
             The agent has your brief <em>and</em> your folio. A few quick
             calibrations before it composes today's route.
           </p>
-          <div className={`dialogue-stamp ${stream.composed ? 'is-done' : ''}`}>
-            {stream.composed     && 'Composed'}
-            {stream.awaitingUser && 'Awaiting reply'}
-            {stream.status === 'streaming' && 'Thinking'}
-            {stream.status === 'connecting' && 'Connecting'}
-            {stream.status === 'error'    && 'Error'}
+          <div className={`dialogue-stamp ${stream.composed ? 'is-done' : ''}`} role="status">
+            {stream.composed       && 'Composed'}
+            {stream.awaitingUser   && 'Awaiting reply'}
+            {stream.status === 'streaming'    && 'Thinking'}
+            {stream.status === 'connecting'   && 'Connecting'}
+            {stream.status === 'reconnecting' && 'Reconnecting…'}
+            {stream.status === 'error'        && 'Error'}
           </div>
 
           <div className="memory-recap">
@@ -156,7 +205,7 @@ export default function Dialogue() {
           )}
         </aside>
 
-        <div className="transcript">
+        <div className="transcript" role="log" aria-live="polite" aria-relevant="additions">
 
           {stream.turns.map((turn, i) => <Turn key={i} turn={turn} />)}
 
@@ -187,9 +236,9 @@ export default function Dialogue() {
           )}
 
           {stream.error && (
-            <div className="turn">
-              <div className="turn-who" style={{ color: '#f87171' }}>Error</div>
-              <div className="turn-msg" style={{ color: '#f87171', fontSize: 16, marginBottom: 12 }}>
+            <div className="turn" role="alert">
+              <div className="turn-who error">Error</div>
+              <div className="turn-msg error" style={{ fontSize: 16, marginBottom: 12 }}>
                 {stream.error}
               </div>
               <div className="dialogue-error-actions">
@@ -200,7 +249,17 @@ export default function Dialogue() {
           )}
 
         </div>
-      </div>
+      </main>
+
+      <ConfirmDialog
+        open={confirmingAbort}
+        title="Stop this walk?"
+        message="This discards the current draft. You'll need to start over."
+        confirmLabel="Stop walk"
+        danger
+        onConfirm={confirmAbort}
+        onCancel={() => setConfirmingAbort(false)}
+      />
     </div>
   );
 }

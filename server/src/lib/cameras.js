@@ -19,12 +19,12 @@ export const CAMERAS = [
   { id: 'nikon-z6iii', type: 'mirrorless', label: 'Nikon Z6 III' },
   { id: 'leica-sl3',   type: 'mirrorless', label: 'Leica SL3' },
 
-  // Medium format
-  { id: 'hassel-x2d2', type: 'medium', label: 'Hasselblad X2D II 100C' },
-  { id: 'fuji-gfx100', type: 'medium', label: 'Fujifilm GFX 100 II' },
-  { id: 'hassel-907x', type: 'medium', label: 'Hasselblad 907X & CFV 100C' },
+  // Medium format — fixed-kit bodies; the two lenses shot most often for each
+  { id: 'hassel-x2d2', type: 'medium', label: 'Hasselblad X2D II 100C',      lensSpec: '38mm f/2.5 V · 90mm f/2.5 V' },
+  { id: 'fuji-gfx100', type: 'medium', label: 'Fujifilm GFX 100 II',         lensSpec: '63mm f/2.8 · 110mm f/2' },
+  { id: 'hassel-907x', type: 'medium', label: 'Hasselblad 907X & CFV 100C',  lensSpec: '80mm f/2.4' },
 
-  // Film
+  // Film — lensSpec left blank; the photographer types their own lens + stock
   { id: 'leica-m6',    type: 'film', label: 'Leica M6 (35mm)' },
   { id: 'mamiya-7ii',  type: 'film', label: 'Mamiya 7 II (medium format)' },
   { id: 'hassel-500',  type: 'film', label: 'Hasselblad 500C/M (medium format)' },
@@ -45,8 +45,6 @@ export const STYLE_OPTIONS = [
 ];
 
 export const TOD_OPTIONS = ['dawn', 'morning', 'midday', 'golden', 'blue', 'night'];
-
-export const MOBILITY_OPTIONS = ['foot', 'transit', 'bike', 'ride'];
 
 export const DURATIONS = [
   { id: '1h',  label: '1 hour — a short walk',     minutes: 60  },

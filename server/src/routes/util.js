@@ -21,7 +21,7 @@ router.get('/util/reverse-geocode', requireAuth, async (req, res) => {
     url.searchParams.set('access_token', config.mapboxToken);
     url.searchParams.set('limit', '1');
     url.searchParams.set('types', 'neighborhood,locality,place');
-    const r = await fetch(url);
+    const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     const data = await r.json();
     const f = data.features?.[0];
     if (!f) return res.status(404).json({ error: 'No place found' });

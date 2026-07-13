@@ -9,9 +9,18 @@
     "build": "npm --prefix client run build && cp -r client/dist server/public",
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "postinstall": "npm --prefix server install && npm --prefix client install",
-    "start": "npm --prefix server run start"
+    "start": "npm --prefix server run start",
+    "lint": "eslint .",
+    "test": "npm --prefix server test"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^8.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5"
   }
 }

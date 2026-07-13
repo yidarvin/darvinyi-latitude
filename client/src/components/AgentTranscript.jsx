@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
 
 export const TOOL_LABELS = {
@@ -59,6 +59,7 @@ export function ReplyBox({ question, onSubmit, placeholder = 'Type your answerâ€
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef(null);
+  const questionId = useId();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -81,11 +82,12 @@ export function ReplyBox({ question, onSubmit, placeholder = 'Type your answerâ€
   return (
     <div className="turn">
       <div className="turn-who agent">Latitude Â· Agent</div>
-      <div className="turn-msg" style={{ marginBottom: 8 }}>{renderEmphasis(question)}</div>
+      <div className="turn-msg" id={questionId} style={{ marginBottom: 8 }}>{renderEmphasis(question)}</div>
       <div className="turn-input">
         <input
           ref={inputRef}
           type="text"
+          aria-labelledby={questionId}
           placeholder={placeholder}
           value={text}
           onChange={(e) => setText(e.target.value)}

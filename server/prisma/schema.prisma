@@ -14,17 +14,20 @@ model User {
   id              String     @id @default(cuid())
   email           String     @unique
   passwordHash    String
-  // Encrypted Anthropic API key (AES-256-GCM)
-  apiKeyCipher    String     // base64
-  apiKeyNonce     String     // base64
-  apiKeyAuthTag   String     // base64
+  // Encrypted Anthropic API key (AES-256-GCM) — null once the user removes it
+  apiKeyCipher    String?    // base64
+  apiKeyNonce     String?    // base64
+  apiKeyAuthTag   String?    // base64
+  // Freshest folio insight, regenerated (best-effort) after each compose —
+  // see agent/loop.js generateFolioInsight. Null falls back to the
+  // template-built insight in routes/folio.js.
+  insightText         String?   @db.Text
+  insightGeneratedAt  DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   walks           Walk[]
   agentRuns       AgentRun[]
-
-  @@index([email])
 }
 
 // ────────────────────────────────────────────────────────
@@ -52,13 +55,12 @@ model Walk {
   distanceM       Int        // walking distance in meters
   cameraBody      String
   lensSpec        String
-  mobility        String[]   // ['foot','transit','bike','ride']
+  mobility        String[]   // always ['foot'] — Latitude only routes walking
   styles          String[]   // ['street','architecture',...]
   intent          String?    @db.Text
 
   // Routing
   walkingPolyline String?    @db.Text // encoded polyline from Mapbox
-  transitPolyline String?    @db.Text
 
   // Composed narrative
   conditions      Json       // { light, weather, camera_notes, afterward }
@@ -70,7 +72,9 @@ model Walk {
   stops           Stop[]
   agentRun        AgentRun?
 
-  @@index([userId, createdAt(sort: Desc)])
+  // Every hot query (folio list, get_user_history, insight) orders by
+  // `date` desc, not `createdAt` — index the column that's actually sorted on.
+  @@index([userId, date(sort: Desc)])
 }
 
 // ────────────────────────────────────────────────────────
@@ -89,8 +93,9 @@ model Stop {
   durationMin     Int
   brief           String     @db.Text
 
+  // No separate index on walkId alone — the unique constraint below already
+  // leads with walkId, so Postgres can use it for walkId-only lookups too.
   @@unique([walkId, ordinal])
-  @@index([walkId])
 }
 
 // ────────────────────────────────────────────────────────

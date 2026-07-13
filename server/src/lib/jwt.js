@@ -3,17 +3,23 @@ import { config } from '../config.js';
 
 const ISSUER = 'latitude';
 const EXPIRES_IN = '7d';
+const ALGORITHM = 'HS256';
 
 export function signToken(userId) {
   return jwt.sign({ sub: userId }, config.jwtSecret, {
     issuer: ISSUER,
     expiresIn: EXPIRES_IN,
+    algorithm: ALGORITHM,
   });
 }
 
 export function verifyToken(token) {
   try {
-    const payload = jwt.verify(token, config.jwtSecret, { issuer: ISSUER });
+    // Pin the accepted algorithm explicitly — without this, jwt.verify()
+    // accepts whatever alg the token header claims, which is the standard
+    // algorithm-confusion footgun if the signing key or verify options ever
+    // change to accept key objects (e.g. RS256 support) down the line.
+    const payload = jwt.verify(token, config.jwtSecret, { issuer: ISSUER, algorithms: [ALGORITHM] });
     return { userId: payload.sub };
   } catch {
     return null;

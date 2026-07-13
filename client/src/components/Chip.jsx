@@ -1,7 +1,10 @@
-export function Chip({ selected, children, onClick, ...rest }) {
+export function Chip({ selected, children, onClick, role, ...rest }) {
   const cls = ['chip', selected && 'is-selected'].filter(Boolean).join(' ');
+  const stateProps = role === 'radio'
+    ? { role: 'radio', 'aria-checked': selected }
+    : { 'aria-pressed': selected };
   return (
-    <button type="button" className={cls} onClick={onClick} {...rest}>
+    <button type="button" className={cls} onClick={onClick} {...stateProps} {...rest}>
       {children}
     </button>
   );
@@ -15,8 +18,9 @@ export function Chip({ selected, children, onClick, ...rest }) {
  *   - value:   string | string[] depending on mode
  *   - onChange:(next) => void
  *   - mode:    'single' | 'multi' (default 'single')
+ *   - label:   accessible name for the group (read by screen readers)
  */
-export function ChipGroup({ options, value, onChange, mode = 'single' }) {
+export function ChipGroup({ options, value, onChange, mode = 'single', label }) {
   const isSelected = (v) =>
     mode === 'multi' ? (value || []).includes(v) : value === v;
 
@@ -31,10 +35,15 @@ export function ChipGroup({ options, value, onChange, mode = 'single' }) {
   };
 
   return (
-    <div className="chip-row" role="group">
+    <div
+      className="chip-row"
+      role={mode === 'single' ? 'radiogroup' : 'group'}
+      aria-label={label}
+    >
       {options.map((opt) => (
         <Chip
           key={opt.value}
+          role={mode === 'single' ? 'radio' : undefined}
           selected={isSelected(opt.value)}
           onClick={() => handleClick(opt.value)}
         >

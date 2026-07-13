@@ -9,22 +9,39 @@ export default function StepIndicator({ steps, current, onJump }) {
   return (
     <nav
       className="steps"
+      aria-label="Walk creation progress"
       style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
     >
       {steps.map((s, i) => {
         const isCurrent = i === currentIdx;
         const isDone = i < currentIdx;
+        const isClickable = !!onJump && (isDone || isCurrent);
         const cls = ['step', isCurrent && 'is-current', isDone && 'is-done']
           .filter(Boolean).join(' ');
-        return (
+        const content = (
+          <>
+            <div className="step-num">{String(i + 1).padStart(2, '0')}</div>
+            <div className="step-label">{s.label}</div>
+          </>
+        );
+        return isClickable ? (
+          <button
+            key={s.key}
+            type="button"
+            className={cls}
+            onClick={() => onJump(s.key)}
+            aria-current={isCurrent ? 'step' : undefined}
+          >
+            {content}
+          </button>
+        ) : (
           <div
             key={s.key}
             className={cls}
-            onClick={onJump && (i < currentIdx || isCurrent) ? () => onJump(s.key) : undefined}
-            style={{ cursor: onJump && (i < currentIdx || isCurrent) ? 'pointer' : 'default' }}
+            style={{ cursor: 'default' }}
+            aria-current={isCurrent ? 'step' : undefined}
           >
-            <div className="step-num">{String(i + 1).padStart(2, '0')}</div>
-            <div className="step-label">{s.label}</div>
+            {content}
           </div>
         );
       })}

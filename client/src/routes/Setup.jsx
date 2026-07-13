@@ -76,7 +76,7 @@ export default function Setup() {
         <Brand to="/setup" />
       </header>
 
-      <div className="setup-grid">
+      <main className="setup-grid">
         <div className="setup-intro">
           <div className="kicker">A walking agenda · Ed. 2026</div>
           <h1 className="display">
@@ -136,8 +136,12 @@ export default function Setup() {
               disabled={submitting}
               hint={
                 <>
-                  <strong>Encrypted at rest.</strong> Used only when the agent thinks.
-                  You can rotate it any time from Account.
+                  <strong>Encrypted at rest.</strong> Used only when the agent thinks —
+                  roughly $0.10&ndash;0.30 per walk in Anthropic usage on your own key.
+                  Get one at{' '}
+                  <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                    console.anthropic.com
+                  </a>. You can rotate it any time from Account.
                 </>
               }
             />
@@ -163,7 +167,7 @@ export default function Setup() {
             )}
           </div>
         </form>
-      </div>
+      </main>
     </div>
   );
 }

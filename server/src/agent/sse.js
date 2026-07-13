@@ -12,6 +12,7 @@ export function createSSE(res) {
   res.flushHeaders();
 
   let closed = false;
+  const closeListeners = [];
 
   function send(event, data) {
     if (closed) return;
@@ -31,10 +32,25 @@ export function createSSE(res) {
   function close() {
     if (closed) return;
     closed = true;
+    for (const cb of closeListeners) { try { cb(); } catch {} }
     try { res.end(); } catch {}
   }
 
-  res.on('close', () => { closed = true; });
+  res.on('close', () => {
+    const wasOpen = !closed;
+    closed = true;
+    if (wasOpen) { for (const cb of closeListeners) { try { cb(); } catch {} } }
+  });
 
-  return { send, heartbeat, close, isClosed: () => closed };
+  // Register a callback fired exactly once, whenever this stream closes —
+  // whether the client disconnected or we called close() ourselves. Lets a
+  // caller (the agent loop) abort in-flight work the instant the connection
+  // it's streaming to goes away, rather than only noticing at the next
+  // natural checkpoint.
+  function onClose(cb) {
+    if (closed) { cb(); return; }
+    closeListeners.push(cb);
+  }
+
+  return { send, heartbeat, close, isClosed: () => closed, onClose };
 }

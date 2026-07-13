@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAgentStream } from '../hooks/useAgentStream.js';
 import { Turn, ReplyBox } from './AgentTranscript.jsx';
 import { renderEmphasis } from '../lib/markdownLite.jsx';
@@ -18,15 +18,22 @@ const EXAMPLES = [
 export default function RefinePanel({ runId, onComposed }) {
   const stream = useAgentStream(runId, { autoStart: false });
   const [text, setText] = useState('');
+  const [reloadFailed, setReloadFailed] = useState(false);
   const lastComposed = useRef(null);
 
-  // Fire onComposed once per recompose so the Plan reloads the updated walk.
+  // onComposed (Plan's reloadWalk) reports whether the refetch actually
+  // succeeded — surface that honestly instead of always claiming "Updated."
+  const applyReload = useCallback(async () => {
+    const ok = await onComposed?.();
+    setReloadFailed(ok === false);
+  }, [onComposed]);
+
   useEffect(() => {
     if (stream.composed && stream.composed !== lastComposed.current) {
       lastComposed.current = stream.composed;
-      onComposed?.();
+      applyReload();
     }
-  }, [stream.composed, onComposed]);
+  }, [stream.composed, applyReload]);
 
   const busy    = stream.status === 'streaming' || stream.status === 'connecting';
   const canType = !busy && !stream.awaitingUser;
@@ -36,6 +43,7 @@ export default function RefinePanel({ runId, onComposed }) {
     const note = text.trim();
     if (!note || busy) return;
     setText('');
+    setReloadFailed(false);
     await stream.refine(note);
   };
 
@@ -51,7 +59,7 @@ export default function RefinePanel({ runId, onComposed }) {
       <div className="shotlist-title refine-title">Refine with the <em>agent</em></div>
 
       {started && (
-        <div className="transcript refine-transcript">
+        <div className="transcript refine-transcript" role="log" aria-live="polite" aria-relevant="additions">
           {stream.turns.map((t, i) => <Turn key={i} turn={t} />)}
 
           {stream.activeText && (
@@ -72,22 +80,29 @@ export default function RefinePanel({ runId, onComposed }) {
           )}
 
           {busy && !stream.activeText && !stream.awaitingUser && (
-            <div className="refine-status">Reworking the route…</div>
+            <div className="refine-status" role="status">Reworking the route…</div>
           )}
 
           {stream.composed && !busy && (
             <div className="turn">
               <div className="turn-who agent">Latitude · Agent</div>
-              <div className="turn-msg" style={{ color: 'var(--accent)' }}>
-                <em>Updated.</em> The plan now reflects your note.
-              </div>
+              {reloadFailed ? (
+                <div className="turn-msg error">
+                  The route was updated, but reloading the plan failed.{' '}
+                  <button type="button" className="refine-retry-link" onClick={applyReload}>Retry</button>
+                </div>
+              ) : (
+                <div className="turn-msg" style={{ color: 'var(--accent)' }}>
+                  <em>Updated.</em> The plan now reflects your note.
+                </div>
+              )}
             </div>
           )}
 
           {stream.error && (
-            <div className="turn">
-              <div className="turn-who" style={{ color: '#f87171' }}>Error</div>
-              <div className="turn-msg" style={{ color: '#f87171' }}>{stream.error}</div>
+            <div className="turn" role="alert">
+              <div className="turn-who error">Error</div>
+              <div className="turn-msg error">{stream.error}</div>
             </div>
           )}
         </div>
@@ -104,6 +119,7 @@ export default function RefinePanel({ runId, onComposed }) {
           <div className="turn-input">
             <input
               type="text"
+              aria-label="Refine note"
               placeholder="e.g. swap stop 4 for something quieter"
               value={text}
               onChange={(e) => setText(e.target.value)}

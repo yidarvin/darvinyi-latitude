@@ -18,8 +18,8 @@ Matches the look of textbook.darvinyi.com: dark base, single teal-cyan accent, e
   /* Text */
   --text:         #e8e6e1;
   --text-soft:    #a0a0a0;
-  --text-faint:   #6a6a6a;
-  --text-dim:     #4a4a4a;
+  --text-faint:   #8a8a8a; /* functional labels/meta — meets 4.5:1 on dark surfaces */
+  --text-dim:     #4a4a4a; /* decorative only (placeholders, dividers) — never for meaningful text */
 
   /* Single accent — teal/cyan */
   --accent:       #2dd4bf;
@@ -27,10 +27,20 @@ Matches the look of textbook.darvinyi.com: dark base, single teal-cyan accent, e
   --accent-dim:   rgba(45, 212, 191, 0.14);
   --accent-faint: rgba(45, 212, 191, 0.06);
   --accent-line:  rgba(45, 212, 191, 0.35);
+
+  /* Functional */
+  --danger:       #f87171;
 }
 ```
 
-No other color is used. No reds, no yellows, no purples, no gradients except subtle accent radial atmospheres.
+`--danger` is the one exception to "single accent" — used only for destructive actions and error states (form errors, failed tool calls, the delete-walk hover state, the danger confirm-dialog button). Never used decoratively.
+
+## Accessibility baseline
+
+- **Focus:** every interactive element (`a`, `button`, anything with `tabindex`) gets a 2px `var(--accent)` outline on `:focus-visible`, set globally in `global.css`. `.form-input` and `.turn-input input` carry their own focus-visible outline since they already have a visible focus border treatment.
+- **Reduced motion:** a global `@media (prefers-reduced-motion: reduce)` block collapses all animation/transition durations to near-zero. Map interactions (`Plan.jsx`'s `PanController`) check `matchMedia('(prefers-reduced-motion: reduce)')` and use `map.setView()` instead of the animated `map.flyTo()` when set.
+- **Color is never the only signal:** `.chip.is-selected` also gets a `✓` prefix (`::before`), not just a color/border change.
+- **Landmarks:** every route wraps its content in a single `<main>` (after `<TopNav>`'s `<header>`) with exactly one `<h1>`.
 
 ## Typography
 
@@ -104,7 +114,10 @@ Two variants. Primary is accent-on-dark; ghost is bordered.
   color:       var(--accent)
   border:      var(--accent)
   box-shadow:  inset 0 0 0 1px var(--accent-line)
+  ::before:    "✓ "  /* non-color selected indicator, WCAG 1.4.1 */
 ```
+
+`Chip` renders a real `<button>` with `aria-pressed` (multi-select) or `role="radio"` + `aria-checked` (single-select, via `ChipGroup`'s `role="radiogroup"`). `ChipGroup` takes a `label` prop for its accessible name.
 
 ### Input
 

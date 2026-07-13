@@ -22,6 +22,14 @@ const SEED_EMAIL = process.env.SEED_EMAIL || 'dev@latitude.test';
 const SEED_PASSWORD = process.env.SEED_PASSWORD || 'hunter22hunter22';
 
 async function main() {
+  // This upserts a well-known email + password (and wipes that account's
+  // walks) — safe against a local dev DB, destructive and a real account
+  // takeover if ever pointed at production. Require an explicit opt-in.
+  if (process.env.NODE_ENV === 'production' && process.env.FORCE_SEED !== '1') {
+    console.error('Refusing to seed with NODE_ENV=production. If this is genuinely intentional, set FORCE_SEED=1.');
+    process.exit(1);
+  }
+
   if (!process.env.API_KEY_ENCRYPTION_KEY) {
     throw new Error('API_KEY_ENCRYPTION_KEY must be set in env to run seed');
   }
@@ -58,13 +66,13 @@ async function main() {
       durationMin: 165, distanceM: 4100,
       cameraBody: 'Fujifilm X100VI',
       lensSpec: '35mm equiv. f/2',
-      mobility: ['foot', 'transit'],
+      mobility: ['foot'],
       styles: ['landscape', 'minimal'],
       stops: [
         { name: 'Ocean Beach south parking', lat: 37.7458, lng: -122.5088 },
         { name: 'Lawton & Great Highway',    lat: 37.7585, lng: -122.5085 },
         { name: 'Java Beach Café (Judah)',   lat: 37.7603, lng: -122.5084 },
-        { name: 'Java Beach Café (Judah)',   lat: 37.7603, lng: -122.5084 },
+        { name: 'Judah & 46th streetcar turnaround', lat: 37.7605, lng: -122.5095 },
       ],
     },
     {
@@ -99,7 +107,7 @@ async function main() {
       durationMin: 220, distanceM: 6800,
       cameraBody: 'Leica Q3',
       lensSpec: '28mm Summilux f/1.7',
-      mobility: ['foot', 'transit'],
+      mobility: ['foot'],
       styles: ['landscape', 'fineart'],
       stops: [
         { name: 'Main Post bandstand',        lat: 37.7989, lng: -122.4625 },
@@ -139,7 +147,7 @@ async function main() {
       durationMin: 180, distanceM: 3400,
       cameraBody: 'Fujifilm X100VI',
       lensSpec: '35mm equiv. f/2',
-      mobility: ['foot', 'transit'],
+      mobility: ['foot'],
       styles: ['street', 'color'],
       stops: [
         { name: 'Clarion Alley entrance',     lat: 37.7626, lng: -122.4220 },

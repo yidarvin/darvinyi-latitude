@@ -3,37 +3,51 @@ import { config } from '../config.js';
 const BASE = 'https://api.mapbox.com';
 
 /**
- * Forward geocode a free-text place into a coordinate + canonical info.
- * Uses Mapbox Geocoding v6.
+ * Forward geocode a free-text place into candidate coordinates + canonical
+ * info. Uses Mapbox's Search Box API rather than Geocoding v6 — v6 cannot
+ * return POI features under any `types` filter (POI search moved to Search
+ * Box), and photography stops are very often landmarks/POIs ("Sutro Baths",
+ * "Palace of Fine Arts") that v6 would silently fail to find.
  *
- * @param {string} query  e.g., "Mission District, San Francisco"
- * @returns {Promise<{name, lat, lng, neighborhood, city, full}>}
+ * @param {string} query  e.g., "Mission District, San Francisco" or "Sutro Baths"
+ * @param {object} [opts]
+ * @param {{lat:number,lng:number}} [opts.proximity]  bias ambiguous results
+ *   toward this coordinate (e.g. the walk's already-established center)
+ * @returns {Promise<{ results: Array<{name, lat, lng, neighborhood, city, full}> }>}
+ *   Up to 3 ranked candidates — callers should let the model disambiguate
+ *   rather than blindly trusting the first result.
  */
-export async function geocode(query) {
-  const url = new URL(`${BASE}/search/geocode/v6/forward`);
+export async function geocode(query, { proximity } = {}) {
+  const url = new URL(`${BASE}/search/searchbox/v1/forward`);
   url.searchParams.set('q', query);
   url.searchParams.set('access_token', config.mapboxToken);
-  url.searchParams.set('limit', '1');
-  url.searchParams.set('types', 'neighborhood,locality,place,address,street');
+  url.searchParams.set('limit', '3');
+  url.searchParams.set('types', 'poi,address,street,neighborhood,locality,place');
+  if (proximity) {
+    url.searchParams.set('proximity', `${proximity.lng},${proximity.lat}`);
+  }
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`Mapbox geocode failed: ${res.status}`);
   const data = await res.json();
 
-  const feature = data.features?.[0];
-  if (!feature) throw new Error(`No geocode result for "${query}"`);
-
-  const [lng, lat] = feature.geometry.coordinates;
-  const props = feature.properties;
-  const ctx = props.context || {};
+  const features = data.features || [];
+  if (features.length === 0) throw new Error(`No geocode result for "${query}"`);
 
   return {
-    name:         props.name || query,
-    lat,
-    lng,
-    neighborhood: ctx.neighborhood?.name || null,
-    city:         ctx.place?.name || ctx.locality?.name || null,
-    full:         props.full_address || props.place_formatted || props.name,
+    results: features.map((feature) => {
+      const [lng, lat] = feature.geometry.coordinates;
+      const props = feature.properties;
+      const ctx = props.context || {};
+      return {
+        name:         props.name || query,
+        lat,
+        lng,
+        neighborhood: ctx.neighborhood?.name || null,
+        city:         ctx.place?.name || ctx.locality?.name || null,
+        full:         props.full_address || props.place_formatted || props.name,
+      };
+    }),
   };
 }
 
@@ -55,7 +69,7 @@ export async function walkingDirections(stops) {
   url.searchParams.set('overview', 'full');
   url.searchParams.set('steps', 'false');
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`Mapbox directions failed: ${res.status}`);
   const data = await res.json();
   const route = data.routes?.[0];
@@ -69,32 +83,5 @@ export async function walkingDirections(stops) {
       distance_m: Math.round(l.distance),
       duration_s: Math.round(l.duration),
     })),
-  };
-}
-
-/**
- * Get a transit route from origin to destination using Mapbox driving profile
- * as a stand-in for transit (Mapbox has no first-class transit profile in the
- * Directions API; we approximate with driving distance, which is fine for
- * showing a rough leg on the map).
- */
-export async function transitDirections(origin, destination) {
-  const coords = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-  const url = new URL(`${BASE}/directions/v5/mapbox/driving/${coords}`);
-  url.searchParams.set('access_token', config.mapboxToken);
-  url.searchParams.set('geometries', 'polyline');
-  url.searchParams.set('overview', 'full');
-  url.searchParams.set('steps', 'false');
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Mapbox transit (driving) failed: ${res.status}`);
-  const data = await res.json();
-  const route = data.routes?.[0];
-  if (!route) throw new Error('No transit route found');
-
-  return {
-    polyline:   route.geometry,
-    distance_m: Math.round(route.distance),
-    duration_s: Math.round(route.duration),
   };
 }
